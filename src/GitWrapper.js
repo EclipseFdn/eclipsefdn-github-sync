@@ -1,5 +1,24 @@
-const Octokit = require('@octokit/rest');
+/*******************************************************************************
+ * Copyright (C) 2019 Eclipse Foundation, Inc.
+ * 
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ * 
+ * Contributors: Martin Lowe <martin.lowe@eclipse-foundation.org>
+ * 
+ * SPDX-License-Identifier: EPL-2.0
+ ******************************************************************************/
+
+
+// add additional plugins for octokit to meet best practices
+const Octokit = require('@octokit/rest')
+  .plugin([
+    require('@octokit/plugin-retry'),
+    require('@octokit/plugin-throttling')
+  ]);
 const flatCache = require('flat-cache');
+const winston = require('winston');
 
 // variables for use with the cache
 const teamCacheID = '1';
@@ -26,7 +45,21 @@ var callCount = 0;
 module.exports = function(token) {
   // instantiate octokit
   octokit = new Octokit({
-    auth: token
+    auth: token,
+    throttle: {
+      onRateLimit: (retryAfter, options) => {
+        winston.warn(`Request quota exhausted for request ${options.method} ${options.url}`);
+
+        if (options.request.retryCount === 0) { // only retries once
+          console.log(`Retrying after ${retryAfter} seconds!`);
+          return true;
+        }
+      },
+      onAbuseLimit: (retryAfter, options) => {
+        // does not retry, only logs a warning
+        winston.warn(`Abuse detected for request ${options.method} ${options.url}`);
+      }
+    }
   });
   // enable dry run functionality
   this.setDryRun = function(doDryRun) {
@@ -42,14 +75,15 @@ module.exports = function(token) {
 
 	this.addTeam = function(org, team) {
     if (!org || !team) {
-      console.log('addTeam command requires organization and team to be set');
+      winston.error('addTeam command requires organization and team to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(team);
     // check if the team already exists
-    if (teamCache.getKey(getTeamCacheKey(org, sanitizedTeam)) != null) {
-      console.log(`Team with name ${team} already exists for ${org}, skipping creation`);
-      return;
+    var cachedResult = teamCache.getKey(getTeamCacheKey(org, sanitizedTeam));
+    if (cachedResult != null) {
+      winston.debug(`Team with name ${team} already exists for ${org}, skipping creation`);
+      return cachedResult;
     }
     
 	  // call the API if dry run is not set
@@ -63,10 +97,11 @@ module.exports = function(token) {
 	      // cache the result for later use
 	      teamCache.setKey(getTeamCacheKey(org, sanitizedTeam), result.data);
 	      
-	      console.log(`Done creating team with name: ${org}:${sanitizedTeam}`);
+	      winston.debug(`Done creating team with name: ${org}:${sanitizedTeam}`);
+	      return result.data;
 	    }).catch(err => logError(err, 'team:create'));
 	  } else {
-	    console.log(`Dry run set, not writing new team ${org}:${sanitizedTeam}`);
+	    winston.debug(`Dry run set, not writing new team ${org}:${sanitizedTeam}`);
 	  }
 	};
 	
@@ -75,9 +110,9 @@ module.exports = function(token) {
    * ID given team name and organization. This ID is used in call to attach
    * given repo to a team.
    */
-	this.addRepoToTeam = async function(org, team, repo) {  
+	this.addRepoToTeam = async function(org, team, repo, permissions = "pull") {  
     if (!org || !team || !repo) {
-      console.log('addRepoToTeam command requires organization, team, and repo to be set');
+      winston.error('addRepoToTeam command requires organization, team, and repo to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(team);
@@ -95,12 +130,13 @@ module.exports = function(token) {
 	    return octokit.teams.addOrUpdateRepo({
 			  'owner': org,
 			  'team_id': teamData.id,
-			  'repo': repo
+			  'repo': repo,
+			  'permission': permissions
 			}).then(result => {
-			  console.log(`Done adding repo to team: ${repo} -> ${org}/${sanitizedTeam}`)
+			  winston.debug(`Done adding repo to team: ${repo} -> ${org}/${sanitizedTeam}`)
 			}).catch(err => logError(err, 'team:addOrUpdateRepo'));
 	  } else {
-		  console.log(`Dry run set, not writing new team ${org}/${name}`);	  
+	    winston.debug(`Dry run set, not writing new team ${org}/${name}`);	  
 	  }
 	};
   
@@ -110,7 +146,7 @@ module.exports = function(token) {
    */
   this.inviteUserToTeam = async function(org, team, uname) {  
     if (!org || !team || !uname) {
-      console.log('inviteUserToTeam command requires organization, team, and uname to be set');
+      winston.error('inviteUserToTeam command requires organization, team, and uname to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(team);
@@ -126,7 +162,7 @@ module.exports = function(token) {
     var teamMembers = await getTeamMembers(org, sanitizedTeam, teamData.id);
     for (var i = 0; i < teamMembers.length; i++) {
       if (teamMembers[i].login == uname) {
-        console.log(`User with usernmae '${uname}' is already a member of ${org}/${sanitizedTeam}`);
+        winston.debug(`User with usernmae '${uname}' is already a member of ${org}/${sanitizedTeam}`);
         return;
       }
     }
@@ -138,7 +174,7 @@ module.exports = function(token) {
         'team_id': teamData.id,
         'username': uname
       }).then(result => {
-        console.log(`Done inviting user to team: ${uname} -> ${org}/${sanitizedTeam}`)
+        winston.debug(`Done inviting user to team: ${uname} -> ${org}/${sanitizedTeam}`)
       }).catch(err => logError(err, 'team:addOrUpdateMembership'));
     }
   };
@@ -149,7 +185,7 @@ module.exports = function(token) {
    */
   this.removeUserFromTeam = async function(org, team, uname) {  
     if (!org || !team || !uname) {
-      console.log('removeUserFromTeam command requires organization, team, and uname to be set');
+      winston.error('removeUserFromTeam command requires organization, team, and uname to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(team);
@@ -171,7 +207,7 @@ module.exports = function(token) {
       }
     }
     if (!isMember) {
-      console.log(`User with usernmae '${uname}' is not a member of ${org}/${team}, cannot remove`);
+      winston.warn(`User with usernmae '${uname}' is not a member of ${org}/${team}, cannot remove`);
       return;
     }
 
@@ -182,7 +218,7 @@ module.exports = function(token) {
         'team_id': teamData.id,
         'username': uname
       }).then(result => {
-        console.log(`Done removing user from team: ${uname} -> ${org}/${sanitizedTeam}`)
+        winston.debug(`Done removing user from team: ${uname} -> ${org}/${sanitizedTeam}`)
       }).catch(err => logError(err, 'team:removeMembership'));
     }
   };
@@ -192,7 +228,7 @@ module.exports = function(token) {
    */
   this.renameTeam = async function(org, team, newName) {
     if (!org || !team || !newName) {
-      console.log('renameTeam command requires organization, team, and new team name to be set');
+      winston.debug('renameTeam command requires organization, team, and new team name to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(team);
@@ -211,7 +247,7 @@ module.exports = function(token) {
         'team_id': teamData.id,
         'name': sanitizedNewTeam
       }).then(result => {
-        console.log(`Done renaming team: ${org}/${sanitizedTeam} -> ${org}/${sanitizedNewTeam}`)
+        winston.debug(`Done renaming team: ${org}/${sanitizedTeam} -> ${org}/${sanitizedNewTeam}`)
       }).catch(err => logError(err, 'team:update'));
     }
   };
@@ -221,7 +257,7 @@ module.exports = function(token) {
    */
   this.addRepo = function(org, repo) {
     if (repoCache.getKey(getRepoCacheKey(org, repo)) != null) {
-      console.log(`Repo with name ${repo} already exists for ${org}, skipping creation`);
+      winston.debug(`Repo with name ${repo} already exists for ${org}, skipping creation`);
       
       return repoCache.getKey(getRepoCacheKey(org, repo));
     }
@@ -236,54 +272,53 @@ module.exports = function(token) {
         // cache the result for later use
         repoCache.setKey(getRepoCacheKey(org, repo), result.data);
         
-        console.log(`Done creating repo for org: ${org}/${repo}`);
+        winston.debug(`Done creating repo for org: ${org}/${repo}`);
         return result.data;
       }).catch(err => logError(err, 'repos:createInOrg'));
     }
   }
+
+  /**
+   * Retrieve all team members associated with a team, using multiple calls if
+   * necessary to get all users on a team.
+   */
+  this.getTeamMembers = async function(org, team, teamId) {
+    return getTeamMembers(org, team, teamId);
+  };
   
   /**
    * Prefetch and fill caches with all existing teams for the current org. Will
    * check if prefetch has already been performed for current org.
    */
-  this.prefetchTeams = async function(org) {
+  this.prefetchTeams =async function(org) {
     if (prefetch['teams'][org] == true) {
       return;
     }
-    console.log(`Starting prefetch for teams in org=${org}`);
+    winston.info(`Starting prefetch for teams in org=${org}`);
     
-    var limit = 100;
-    var page = 1;
-    var result = [];
-    var count = 0;
-    // loop through all available users, and add them to a list to be returned
-    while (page == 1 || (result != null && result.length == limit)) {
-      callCount++;
-      // get the current page of results, incrementing page count after call
-      result = await octokit.teams.list({
-        'org': org,
-        'per_page': limit,
-        'page': page++
-      }).then(result => {
-        // return the data to the user
-        return result.data;
-      }).catch(err => logError(err, 'team:list'));
-      
-      // collect the results
-      if (result != null && result.length > 0) {
-        for (var i = 0; i < result.length; i++) {
-          var team = result[i];
-          var cacheKey = getTeamCacheKey(org, sanitizeTeamName(team.slug));
-          
-          teamCache.setKey(cacheKey, team);
-          count++;
-        }
-      }
+    var options = octokit.teams.list.endpoint.merge({
+      'org': org
+    });
+    var data = await octokit.paginate(options)
+      .then(result => result)
+      .catch(err => logError(err, 'team:list'));
+    if (data == undefined) {
+      return;
     }
+    
+    var count = 0;
+    for (var i = 0; i < data.length; i++) {
+      var team = data[i];
+      var cacheKey = getTeamCacheKey(org, sanitizeTeamName(team.slug));
+      
+      teamCache.setKey(cacheKey, team);
+      count++;
+    }
+    
     // set the prefetch flag for org to true
     prefetch['teams'][org] = true;
-    console.log(`Finished prefetch for org=${org}, got ${count} teams`);
-  }
+    winston.info(`Finished prefetch for org=${org}, got ${count} teams`);
+  };
   
   /**
    * Prefetch and fill caches with all existing repos for the current org. Will
@@ -293,39 +328,28 @@ module.exports = function(token) {
     if (prefetch['repos'][org] == true) {
       return;
     }
-    console.log(`Starting prefetch for repos in org=${org}`);
-    
-    var limit = 100;
-    var page = 1;
-    var result = [];
-    var count = 0;
-    // loop through all available users, and add them to a list to be returned
-    while (page == 1 || (result != null && result.length == limit)) {
-      callCount++;
-      // get the current page of results, incrementing page count after call
-      result = await octokit.repos.listForOrg({
-        'org': org,
-        'per_page': limit,
-        'page': page++
-      }).then(result => {
-        // return the data to the user
-        return result.data;
-      }).catch(err => logError(err, 'team:list'));
-      
-      // collect the results
-      if (result != null && result.length > 0) {
-        for (var i = 0; i < result.length; i++) {
-          var repo = result[i];
-          var cacheKey = getRepoCacheKey(org, repo.name);
-          
-          repoCache.setKey(cacheKey, repo);
-          count++;
-        }
-      }
+    winston.info(`Starting prefetch for repos in org=${org}`);
+    var options = octokit.repos.listForOrg.endpoint.merge({
+      'org': org
+    });
+    var data = await octokit.paginate(options)
+      .then(result => result)
+      .catch(err => logError(err, 'team:listMembers'));
+    if (data == undefined) {
+      return;
     }
+    var count = 0;
+    for (var i = 0; i < data.length; i++) {
+      var repo = data[i];
+      var cacheKey = getRepoCacheKey(org, repo.name);
+      
+      repoCache.setKey(cacheKey, repo);
+      count++;
+    }
+
     // set the prefetch flag for org to true
     prefetch['repos'][org] = true;
-    console.log(`Finished prefetch for org=${org}, got ${count} repos`);
+    winston.info(`Finished prefetch for org=${org}, got ${count} repos`);
   }
 }
 /** END OF EXPORTS */
@@ -333,79 +357,69 @@ module.exports = function(token) {
 
 /**
  * Wraps GitHub team retrieval functionality with simple caching and returning
- * future promises of content, or the content directly if cached.
+ * future promises of content, or the content directly if cached. Deep copies
+ * data to prevent external modification of state
  */
 function getTeam(org, team) {
   // generate a cache key and check if we have a valid cache result.
-  var cacheKey = getTeamCacheKey(org, team);
+  var cacheKey = getTeamCacheKey(org, sanitizeTeamName(team));
   var cachedResult = teamCache.getKey(cacheKey);
   
-  console.log(`Getting team for key: ${cacheKey}`);
+  winston.debug(`Getting team for key: ${cacheKey}`);
   // fetch if we don't have a cached result
   if (cachedResult == null) {
     callCount++;
     return octokit.teams.getByName({
       'org': org,
-      'team_slug': team.replace(/\./g, '-')
+      'team_slug': sanitizeTeamName(team)
     }).then(result => {
       // cache the data in memory for use later
       teamCache.setKey(cacheKey, result.data);
       
       // return the data to the user
-      return result.data;
+      return JSON.parse(JSON.stringify(result.data));
     }).catch(err => logError(err, 'team:getByName'));
   } else {
-    console.log(`Found cached result for key ${cacheKey} \n`);
+    winston.debug(`Found cached result for key ${cacheKey}`);
     
     // return result to be immediately used
-    return cachedResult;
+    return JSON.parse(JSON.stringify(cachedResult));
   }
 }
 
 /**
- * Retrieve all team members associated with a team, using multiple calls if
- * necessary to get all users on a team.
+ * Gets team members from API. Returns deep copies of results to prevent
+ * modification of state data.
  */
 async function getTeamMembers(org, team, teamId) {
   // generate a cache key and check if we have a valid cache result.
   var cacheKey = getTeamMembersCacheKey(org, team);
   var cachedResult = teamCache.getKey(cacheKey);
-  
+
+  winston.debug(`Getting team members for key: ${cacheKey}`);
   // fetch if we don't have a cached result
   if (cachedResult == null) {
-    var limit = 100;
-    var page = 1;
-    var result = [];
-    var data = [];
     // loop through all available users, and add them to a list to be returned
-    while (result.length == limit || page == 1) {
-      callCount++;
-      // get the current page of results, incrementing page count after call
-      result = await octokit.teams.listMembers({
-        'team_id': teamId,
-        'per_page': limit,
-        'page': page++
-      }).then(result => {
-        // return the data to the user
-        return result.data;
-      }).catch(err => logError(err, 'team:listMembers'));
-      
-      // collect the results
-      if (result.length > 0) {
-        for (var i = 0; i < result.length; i++) {
-          data.push(result[i]);
-        }
-      }
+    var options = octokit.teams.listMembers.endpoint.merge({
+      'team_id': teamId
+    });
+    var data = await octokit.paginate(options)
+      .then(result => result)
+      .catch(err => logError(err, 'team:listMembers'));
+    if (data == undefined) {
+      return undefined;
     }
+    
     // save the data to cache to avoid reprocessing
     teamCache.setKey(cacheKey, data);
+    
     // return the data for usage
-    return data;
+    return Array.from(data);
   } else {
-    console.log(`Found cached result for key ${cacheKey} \n`);
+    winston.debug(`Found cached result for key ${cacheKey}`);
     
     // return result to be immediately used
-    return cachedResult;
+    return Array.from(cachedResult);
   }
 }
 
@@ -430,14 +444,11 @@ function getRepoCacheKey(org, repo) {
  * additional contextual information.
  */
 function logError(err, root) {
-  console.log(`API encountered the following errors processing current request (${root}):`);
+  winston.error(`API encountered errors processing current request (${root}). More information is available in log file`);
   if (err.errors) {
     for (var i = 0; i < err.errors.length; i++) {
-      console.log(`\t ${err.errors[i].message}`);
+      winston.debug(`${err.errors[i].message}`);
     }
   }
-
-  if (verbose == true) {
-    console.log(err);
-  }
+  winston.debug(err);
 }

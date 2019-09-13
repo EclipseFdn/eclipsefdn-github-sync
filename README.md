@@ -1,8 +1,13 @@
 # EclipseFdn GitHub Sync toolset
 
-## Running the toolset
+## Running the toolset for development
 
-TODO
+By default, the script is run in docker containers to emulate the production environment (Openshift). This sync tool can be run in standard and verbose mode. The difference between the modes is that in verbose all log messages are printed to the STDOUT of the container.
+
+Before running, a `secret` file should be created that contains the GitHub API key to be used for connectivity. This should be created in the root folder of the project.  
+
+- Default run: `docker-compose up --build -d`
+- Verbose run: `docker run --env VERBOSE_VAL=true -d <container_name>`
 
 ## Maintainers
 

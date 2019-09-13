@@ -1,5 +1,23 @@
+/****************************************************************
+ Copyright (C) 2019 Eclipse Foundation, Inc.
+ 
+ This program and the accompanying materials are made
+ available under the terms of the Eclipse Public License 2.0
+ which is available at https://www.eclipse.org/legal/epl-2.0/
+ 
+  Contributors:
+    Martin Lowe <martin.lowe@eclipse-foundation.org>
+    
+ SPDX-License-Identifier: EPL-2.0
+******************************************************************/
+
 var wrapper = require('./GitWrapper.js');
-var readline = require('readline');
+const fs = require('fs');
+const winston = require('winston');
+
+var now = new Date();
+winston.add(new winston.transports.File({ filename: `logs/cli-${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDay()}.log` }));
+winston.add(new winston.transports.Console({ level: 'error' }));
 
 // set up yargs command line parsing
 var argv = require('yargs')
@@ -46,17 +64,30 @@ var argv = require('yargs')
   .epilog('Copyright 2019 Eclipse Foundation inc.')
   .argv;
 
-// read in secret from command line
-var rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-rl.question('Please enter your GitHub access token: ', (answer) => acceptInput(answer));
+
+_prepareSecret();
+
+/**
+ * Retrieves secret API token from system, and then starts the script via _init
+ * 
+ * @returns
+ */
+function _prepareSecret() {
+  //retrieve the secret API token
+  fs.readFile('/run/secrets/api-token', {encoding: 'utf-8'}, function(err,data){
+     if (!err && data != undefined && data.length > 0) {
+         run(argv, data.trim());
+     } else {
+         winston.error(err);
+         return;
+     }
+  });
+}
 
 function run(argv, secret) {
   // check that we have a command
   if (!argv._ || !argv._[0]) {
-    console.log('The <command> must be set to use the toolset');
+    winston.debug('The <command> must be set to use the toolset');
     return;
   }
   
@@ -77,16 +108,4 @@ function run(argv, secret) {
   } else if (argv._[0] === 'add_repo') {
     wrap.addRepo(argv.o, argv.r);
   }
-}
-
-// best attempt at basic input checking
-function acceptInput(answer) {
-  var secret = answer.trim();
-  if (!secret || secret.length == 0) {
-    console.log('A token is required to run sync functionality, please try again');
-    return rl.question('Please enter your GitHub access token: ', (answer) => acceptInput(answer));
-  }
-
-  rl.close();
-  run(argv, secret);
 }
