@@ -1,0 +1,75 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: eclipsefdn-github-sync
+  namespace: foundation-internal-webdev-apps
+spec:
+  schedule: "*/20 * * * *"
+  # if it is time for a new job run and the previous job run hasn’t finished yet, the cron job skips the new job run
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: eclipsefdn-github-sync
+            image: eclipsefdn/eclipsefdn-github-sync:latest
+            imagePullPolicy: Always # TODO: change to IfNotPresent once the deploy step is integrated into CD
+            args:
+            - /bin/sh
+            - -c
+            - npm start -- --verbose=true --dryrun=true | tee -a /app/logs/stdout-$(date +%Y%m%d).log
+            volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+            - name: cache
+              mountPath: /app/.cache
+            - name: github-sync-secrets
+              mountPath: "/run/secrets/api-token"
+              readOnly: true
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              subPath: api-token
+          restartPolicy: Never
+          volumes:
+          - name: logs
+            persistentVolumeClaim:
+              claimName: github-sync-logs
+          - name: cache
+            emptyDir: {}
+          - name: github-sync-secrets
+            secret:
+              secretName: github-sync-secrets
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              items:
+              - key: api-token
+                path: api-token
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: github-sync-logs
+  annotations:
+    volume.beta.kubernetes.io/mount-options: rw,nfsvers=3,noexec
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  claimRef:
+    namespace: foundation-internal-webdev-apps
+    name: github-sync-logs
+  nfs:
+    server: fred
+    path: /opt/export/eclipsefdn-github-sync/logs
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: github-sync-logs
+  namespace: foundation-internal-webdev-apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
