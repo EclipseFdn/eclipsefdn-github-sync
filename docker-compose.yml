@@ -7,10 +7,10 @@ services:
       - ./.cache:/app/.cache
     environment:
       - VERBOSE_VAL=true
+      - DRYRUN=true
     secrets:
       - api-token
-      
+
 secrets:
   api-token:
     file: secret
-            

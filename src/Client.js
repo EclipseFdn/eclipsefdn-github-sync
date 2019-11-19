@@ -16,7 +16,7 @@ const fs = require('fs');
 const winston = require('winston');
 
 var now = new Date();
-winston.add(new winston.transports.File({ filename: `logs/cli-${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDay()}.log` }));
+winston.add(new winston.transports.File({ filename: `logs/cli-${now.getUTCFullYear()}-${now.getUTCMonth()+1}-${now.getUTCDate()}.log` }));
 winston.add(new winston.transports.Console({ level: 'error' }));
 
 // set up yargs command line parsing

@@ -50,7 +50,7 @@ winston.configure({
     ),
   transports: [
     new winston.transports.File({ 
-      filename: `logs/sync-${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDay()}.log`, 
+      filename: `logs/sync-${now.getUTCFullYear()}-${now.getUTCMonth()+1}-${now.getUTCDate()}.log`, 
       level: 'debug' 
       }),
     new winston.transports.Console({ level: argv.V ? 'debug' : 'error' })
