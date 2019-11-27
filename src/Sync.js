@@ -106,6 +106,7 @@ async function _init(secret) {
   var hasMore = true;
   var result = [];
   var data = [];
+  console.log('Loading Eclipse API data!');
   var url = 'https://projects.eclipse.org/api/projects?github_only=1&';
   // loop through all available users, and add them to a list to be returned
   while (hasMore) {
@@ -150,17 +151,20 @@ async function runSync(data) {
     
     // maintain orgs used by this project
     var orgs = [];
-    for (idx in repos) {
+    for (var idx in repos) {
       var repoUrl = repos[idx].url;
-      var match = /\/([^\/]*)\/([^\/]*)$/.exec(repoUrl);
-      if (match == undefined) {
+      winston.debug(`Checking repo URL: ${repoUrl}`);
+      // strip the repo url to get the org + repo
+      var match = /\/([^\/]+)\/([^\/]+)\/?$/.exec(repoUrl);
+      // check to make sure we got a match
+      if (match == null) {
         continue;
       }
       
       // get the org + repo from the repo URL
       var org = match[1];
       var repo = match[2];
-      winston.debug(`Starting org=${org};repo=${repo}`);
+      winston.debug(`Starting sync for org=${org};repo=${repo}`);
       
       // check if we've processed this org yet, if not, then create teams and add users
       if (!orgs.includes(org)) {
@@ -208,21 +212,22 @@ async function processOrg(org, project) {
 async function updateTeam(org, project, grouping) {
   var projectID = project.project_id;
   var teamName = `${projectID}-${grouping}`;
+  winston.debug(`Syncing team '${teamName}' for organization ${org}`);
   var team = await wrap.addTeam(org, teamName);
   // set team to private
   var result = await wrap.editTeam(team.id, teamName, {"privacy": "secret"});
   var members = await wrap.getTeamMembers(org, teamName, team.id);
   
-  winston.debug(grouping + ' members: ');
-  winston.debug(members);
-  for (idx in project[grouping]) {
+  winston.debug(`${grouping} members: ${JSON.stringify(members)}`);
+  for (var idx in project[grouping]) {
     // get the user via cached HTTP
     var user = await cHttp.getData(project[grouping][idx].url);
     if (user === undefined) {
       winston.warn(`User '${project[grouping][idx].name}' had no associated data on Eclipse API`);
       continue;
     }
-    if (user.github_handle === undefined) {
+    // check if github handle is null or empty
+    if (!user.github_handle || user.github_handle.trim() === "") {
       winston.warn(`User '${project[grouping][idx].name}' has no associated GitHub username, skipping`);
       continue;
     }
@@ -236,8 +241,7 @@ async function updateTeam(org, project, grouping) {
     Atomics.wait(int32, 0, 0, waitTimeInMS);
   }
 
-  winston.debug('Leftover members: ');
-  winston.debug(members);
+  winston.debug(`Leftover members: ${JSON.stringify(members)}`);
   // Commented out until Eclipse API endpoint exists to get user for github handle
   /*
   if (members != undefined) {
