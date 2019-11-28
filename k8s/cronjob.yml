@@ -18,7 +18,7 @@ spec:
             args:
             - /bin/sh
             - -c
-            - npm start -- --verbose=true --dryrun=true | tee -a /app/logs/stdout-$(date +%Y-%m-%d).log
+            - npm start -- --verbose=true | tee -a /app/logs/stdout-$(date +%Y-%m-%d).log
             volumeMounts:
             - name: logs
               mountPath: /app/logs
