@@ -410,6 +410,38 @@ module.exports = function(token) {
       .then(result => result)
       .catch(err => logError(err, 'repos:listRepos'));
   }
+  
+  this.getInvitedMembers = async function(org, team, teamId) {
+    // generate a cache key and check if we have a valid cache result.
+    var cacheKey = getInvitedMembersCacheKey(org, team);
+    var cachedResult = teamCache.getKey(cacheKey);
+
+    console.log(`Getting invited members for key: ${cacheKey}`);
+    // fetch if we don't have a cached result
+    if (cachedResult == null) {
+      // loop through all available users, and add them to a list to be returned
+      var options = octokit.teams.listPendingInvitations.endpoint.merge({
+        'team_id': teamId
+      });
+      var data = await octokit.paginate(options)
+        .then(result => result)
+        .catch(err => logError(err, 'team:listPendingInvitations'));
+      if (data == undefined) {
+        return undefined;
+      }
+      
+      // save the data to cache to avoid reprocessing
+      teamCache.setKey(cacheKey, data);
+      
+      // return the data for usage
+      return Array.from(data);
+    } else {
+      console.log(`Found cached result for key ${cacheKey}`);
+      
+      // return result to be immediately used
+      return Array.from(cachedResult);
+    }
+  };
 
   this.sanitizeTeamName = function(name) {
     return name.toLowerCase().replace(/[^\s\da-zA-Z-]/g, '-');
@@ -496,6 +528,10 @@ function getTeamCacheKey(org, team) {
 
 function getTeamMembersCacheKey(org, team) {
   return `${getTeamCacheKey(org, team)}:members`;
+}
+
+function getInvitedMembersCacheKey(org, team) {
+  return `${getTeamCacheKey(org, team)}:invited`;
 }
 
 function getRepoCacheKey(org, repo) {
