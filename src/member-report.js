@@ -95,7 +95,7 @@ async function run(secret) {
     // create secondary list to modify while looping
     var s = [];
     for (var member in members) {
-      s.push(members[member].login);
+      s.push(members[member].login.toLowerCase());
     }
     console.log(`Found ${s.length} members to process:\n\t${JSON.stringify(s)}`);
     
@@ -112,7 +112,7 @@ async function run(secret) {
     if (invitees != null) {
       s = [];
       for (var invitee in invitees) {
-        s.push(invitees[invitee].login);
+        s.push(invitees[invitee].login.toLowerCase());
       }
       console.log(`Found ${s.length} invited members to process:\n\t${JSON.stringify(s)}`);
       
@@ -251,7 +251,7 @@ async function mapRepoToUsers(data, org) {
         }
         
         // get the handle
-        var githubHandle = eclipseUser["github_handle"];
+        var githubHandle = eclipseUser["github_handle"].toLowerCase();
         for (var m in repos) {
           // get the list of users who have access for the repo
           console.log(`Handle: ${githubHandle}, repo ${repos[m]}`);
