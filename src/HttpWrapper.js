@@ -39,6 +39,25 @@ module.exports = function() {
       .catch(err => console.log(err));
   };
   
+  this.getRaw = async function(url) {
+	// check that we haven't retrieved data yet
+    var cacheResult = httpCache.getKey(url);
+    if (cacheResult != null) {
+      console.log(`Found cached result for endpoint call ${url}`);
+      return cacheResult;
+    }
+    
+    // create call that returns error or result raw, no processing
+    var raw = await axios.get(url)
+      .then(result => {
+        httpCache.setKey(url, result);
+        
+        return result;
+      })
+      .catch(err => err);
+    return raw;
+  };
+  
   this.close = function() {
     httpCache.save(true);
   };

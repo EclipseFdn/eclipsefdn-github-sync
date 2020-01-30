@@ -54,3 +54,11 @@ The project maintains the following source code repositories:
 ### Cache.js (master)
 
 * License: The MIT License (MIT)
+
+### Chai (4.2.0)
+
+* License: The MIT License (MIT)
+
+### Mocha (7.0.1)
+
+* License: The MIT License (MIT)

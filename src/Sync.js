@@ -207,11 +207,15 @@ async function updateTeam(org, project, grouping) {
   console.log(`${grouping} members: ${JSON.stringify(members)}`);
   for (var idx in project[grouping]) {
     // get the user via cached HTTP
-    var user = await cHttp.getData(project[grouping][idx].url);
-    if (user === undefined) {
+    var userRequest = await cHttp.getRaw(project[grouping][idx].url);
+    if (userRequest.response != undefined && userRequest.response.data == 'User not found.') {
       console.log(`User '${project[grouping][idx].name}' had no associated data on Eclipse API`);
       continue;
+    } else if (userRequest.status != 200) {
+      console.log(`Error while fetching data for ${project[grouping][idx].url}, ending all processing`);
+      process.exit(1);
     }
+    var user = userRequest.data;
     // check if github handle is null or empty
     if (!user.github_handle || user.github_handle.trim() === "") {
       console.log(`User '${project[grouping][idx].name}' has no associated GitHub username, skipping`);
@@ -233,17 +237,19 @@ async function updateTeam(org, project, grouping) {
   
     for (var i = 0; i < members.length; i++) {
       var url = `https://api.eclipse.org/github/profile/${members[i].login}`;
-      var result = await axios.get(url).then(result => {
+      var r = await axios.get(url).then(result => {
         return result.data;
-      }).catch(err => console.log(`Received error from Eclipse API querying for : ${err}`));
+      }).catch(err => console.log(`Received error from Eclipse API querying for '${url}': ${err}`));
       // check that we know the user before removing
-      if (result != null && result["github_handle"] === members[i].login) {
+      if (r != undefined && r["github_handle"] === members[i].login) {
         if (argv.D !== true) {
-          console.log(`Removing ${members[i].login} from team ${teamName}`);
+          console.log(`Removing '${members[i].login}' from team '${teamName}'`);
           await wrap.removeUserFromTeam(org, teamName, members[i].login);
         } else {
-          console.log(`Would have deleted ${members[i].login}, but in semi-dry run mode`);
+          console.log(`Would have deleted '${members[i].login}', but in semi-dry run mode`);
         }
+      } else {
+          console.log(`Could not identify '${members[i].login}' from team '${teamName}', skipping`);
       }
     }
   }
