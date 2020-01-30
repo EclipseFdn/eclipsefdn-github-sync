@@ -65,3 +65,4 @@ typings/
 
 # secret auth token
 secret
+/secrets/
