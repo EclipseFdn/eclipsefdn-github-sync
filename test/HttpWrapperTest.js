@@ -12,8 +12,6 @@ describe('HttpWrapper', function() {
 				// known good call to accounts API
 				// use webmaster as user shouldn't change
 				result = await http.getRaw("https://api.eclipse.org/account/profile/webmaster");
-				// fail if there was an error communicating and we get no data back
-				if (!(result instanceof Object)) { done(false) }
 			});
 
 			it('should return 200 status', function() {
