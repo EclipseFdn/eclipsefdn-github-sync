@@ -14,8 +14,13 @@ var argv = require('yargs')
   })
   .option('H', {
     alias: 'host',
-    description: '',
-    default: 'http://127.0.0.1:32882'
+    description: 'GitLab host base URL',
+    default: 'http://gitlab-test.eclipse.org/'
+  })
+  .option('p', {
+    alias: 'provider',
+    description: 'The OAuth provider name set in GitLab',
+    default: 'oauth2_eclipse'
   })
   .help('h')
   .alias('h', 'help')
@@ -24,13 +29,14 @@ var argv = require('yargs')
   .epilog('Copyright 2019 Eclipse Foundation inc.')
   .argv;
 
+const uuid = require('uuid');
+const fs = require('fs');
+
 const { Gitlab } = require('gitlab');
 const EclipseAPI = require('./EclipseAPI.js');
+const axios = require('axios');
 
-const api = new Gitlab({
-  host: argv.H,
-  token: 'zgqZLQXiGAHvDxRqv547',
-});
+var api;
 
 var eApi = new EclipseAPI();
 var bots;
@@ -40,9 +46,31 @@ var namedProjects = {};
 var namedUsers = {};
 var gMems = {};
 
-run();
+_prepareSecret();
 
-async function run() {
+/**
+ * Retrieves secret API token from system, and then starts the script via _init
+ * 
+ * @returns
+ */
+function _prepareSecret() {
+  //retrieve the secret API token
+  fs.readFile('/run/secrets/access-token', {encoding: 'utf-8'}, function(err,data){
+     if (!err && data != undefined) {
+         run(data.trim());
+     } else {
+         console.log("Error while reading access token: " + err);
+         return;
+     }
+  });
+}
+
+async function run(secret) {
+	api = new Gitlab({
+	  host: argv.H,
+	  token: secret,
+	});
+
 	// get raw project data and post process to add additional context
 	var data = await eApi.eclipseAPI();
 	data = eApi.postprocessEclipseData(data);
@@ -62,6 +90,7 @@ async function run() {
 	}
 	groups = undefined;
 	
+	var pCount = 0;
 	for (var projectIdx in projects) {
 		namedProjects[projects[projectIdx].name] = projects[projectIdx];
 	}
@@ -71,22 +100,31 @@ async function run() {
 		namedUsers[users[userIdx].username] = users[userIdx];
 	}
 	users = null;
-
+	
 	// fetch org group from results, create if missing
 	console.log('Starting sync');
 	var g = await getGroup("Eclipse", "eclipse", undefined);
-	if (g == undefined && argv.d) {
-		console.log(`Unable to start sync of GitLab content. Base Eclipse group could not be found and dryrun is set`);
+	if (g == undefined) {
+		if (argv.d) {
+			console.log(`Unable to start sync of GitLab content. Base Eclipse group could not be found and dryrun is set`);
+		} else {
+			console.log(`Unable to start sync of GitLab content. Base Eclipse group could not be created`);
+		}
 		return;
 	}
 	
 	for (projectIdx in data) {
+		
 		var project = data[projectIdx];
 		console.log(`Processing '${project.project_id}'`);	
 		// fetch project group from results, create if missing
 		var projGroup = await getGroup(project.name, project.project_id, g);
-		if (projGroup == undefined && argv.d) {
-			console.log(`Unable to continue processing project with ID '${project.project_id}'. Group does not exist and dryrun has been set.`);
+		if (projGroup == undefined) {
+			if (argv.d) {
+				console.log(`Unable to continue processing project with ID '${project.project_id}'. Group does not exist and dryrun has been set.`);
+			} else {
+				console.log(`Unable to continue processing project with ID '${project.project_id}'. Group does not exist and could not be created.`);
+			}
 			continue;
 		}
 		
@@ -97,6 +135,10 @@ async function run() {
 		for (var usernameIdx in usernames) {
 			var uname = usernames[usernameIdx];
 			var user = await getUser(uname, userList[uname].url);
+			if (user == undefined) {
+				console.log(`Could not retrieve user for UID '${uname}, skipping'`);
+				continue;
+			}
 
 			await addUserToGroup(user, projGroup, userList[uname].access_level);
 		}
@@ -227,7 +269,6 @@ async function getProject(name, url, parent) {
 		var opts = {
 			"name": name,
 			"visibility": "public",
-			"import_url": url,
 		};
 		if (parent !== undefined) {
 			opts.namespace_id = parent.id;
@@ -239,7 +280,9 @@ async function getProject(name, url, parent) {
 		}
 		
 		// create the new project, and track it
-		console.log(`Creating project with options: ${JSON.stringify(opts)}`);
+		if (argv.V) {
+			console.log(`Creating project with options: ${JSON.stringify(opts)}`);
+		}
 		try {
 			p = await api.Projects.create(opts);
 		} catch(err) {
@@ -247,9 +290,12 @@ async function getProject(name, url, parent) {
 				console.log(err);
 			}
 		}
-		if (p == undefined) {
+		if (p == undefined || p instanceof Array) {
 			console.log(`Error while creating project '${name}'`);
 			process.exit(1);
+		}
+		if (argv.V) {
+			console.log(`Created project: ${JSON.stringify(p)}`);
 		}
 		// set it back
 		namedProjects[name] = p;
@@ -271,13 +317,16 @@ async function getGroup(name, path, parent, visibility = "public") {
 		if (parent != undefined) {
 			opts.parent_id = parent.id;
 		}
-		// check if dry run before creating new group
+		// check if dry run before creating group
 		if (argv.d) {
 			console.log(`Dryrun flag active, would have created new group '${name}' with options ${JSON.stringify(opts)}`);
 			return;
 		}
 		
-		console.log(`Creating group with options: ${JSON.stringify(opts)}`);
+		// if verbose is set display user opts
+		if (argv.V) {
+			console.log(`Creating group with options: ${JSON.stringify(opts)}`);
+		}
 		try {
 			g = await api.Groups.create(opts);
 		} catch(err) {
@@ -285,9 +334,12 @@ async function getGroup(name, path, parent, visibility = "public") {
 				console.log(err);
 			}
 		}
-		if (g == undefined) {
+		if (g == undefined || g instanceof Array) {
 			console.log(`Error while creating group '${name}'`);
 			process.exit(1);
+		}
+		if (argv.V) {
+			console.log(`Created group: ${JSON.stringify(g)}`);
 		}
 		// set it back
 		namedGroups[name] = g;
@@ -296,6 +348,11 @@ async function getGroup(name, path, parent, visibility = "public") {
 }
 
 async function getUser(uname, url) {
+	if (url == undefined) {
+		console.log(`Cannot fetch user information for user '${uname}' with no set URL`);
+		return;
+	}
+	
 	var u = namedUsers[uname];
 	if (u == undefined) {
 		if (argv.d) {
@@ -303,21 +360,22 @@ async function getUser(uname, url) {
 			return;
 		}
 
-		console.log(`Creating new user with name '${uname}'`);
-		var name = uname;
-		// if we have a user URL, retrieve user data
-		if (url != undefined) {
-			var data = await axios.get(url).then(result => result.data).catch(err => console.log(err));
-	
-			if (data != undefined) {
-				name = `${data.first_name} ${data.last_name}`;
-			}
+		// retrieve user data
+		var data = await axios.get(url).then(result => result.data).catch(err => console.log(err));
+		if (data == undefined) {
+			console.log(`Cannot create linked user account for '${uname}', no external data found`);
+			return;
 		}
+		console.log(`Creating new user with name '${uname}'`);
 		var opts = {
 			"username": uname,
-			"password": "password",
-			"name": name,
-			"email": 'dummy@eclipse-foundation.org'
+			"password": uuid.v4(),
+			"force_random_password": true,
+			"name": `${data.first_name} ${data.last_name}`,
+			"email": `martin.lowe+${uuid.v4()}@eclipse-foundation.org`,
+			"extern_uid": data.uid,
+			"provider": argv.p,
+			"skip_confirmation": true
 		};
 		// check if dry run before creating new user
 		if (argv.d) {
@@ -325,7 +383,13 @@ async function getUser(uname, url) {
 			return;
 		}
 		
-		console.log(`Creating user with options: ${JSON.stringify(opts)}`);
+		// if verbose, display information being used to generate user
+		if (argv.V) {
+			// copy the object and redact the password for security
+			var optLog = JSON.parse(JSON.stringify(opts));
+			optLog.password = "redacted";
+			console.log(`Creating user with options: ${JSON.stringify(optLog)}`);
+		}
 		try {
 			u = await api.Users.create(opts);
 		} catch(err) {

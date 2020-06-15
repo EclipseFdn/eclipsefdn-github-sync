@@ -1,0 +1,32 @@
+####
+# This Dockerfile is used in order to build a container that the sync script locally in a mode as close to production as possible.
+#
+# Build the image with:
+#
+# docker build -f ./Dockerfile.gitlab -t eclipsefdn/gitlab-sync .
+#
+# Then run the container using:
+#
+# docker run -i --rm -v <full path to a file folder>:/run/secrets eclipsefdn/gitlab-sync
+#
+###
+FROM node:10
+WORKDIR /app
+ARG VERBOSE_VAL=false
+ENV VERBOSE_VAL ${VERBOSE_VAL:-false}
+ARG DRYRUN=false
+ENV DRYRUN ${DRYRUN:-false}
+ARG PROVIDER=oauth2_generic
+ENV PROVIDER ${PROVIDER:-oauth2_generic}
+ARG HOST=https://gitlab.eclipse.org
+ENV HOST ${HOST:-https://gitlab.eclipse.org}
+
+## Copy NPM configs and install dependencies
+COPY package*.json ./
+RUN npm install
+
+## Copy over required script files
+COPY ./src/* ./src/
+
+## run the script
+CMD npm run lab-sync -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --provider=$PROVIDER --host=$HOST

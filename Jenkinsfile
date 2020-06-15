@@ -23,6 +23,9 @@ pipeline {
     IMAGE_NAME = 'eclipsefdn/eclipsefdn-github-sync'
     CRONJOB_NAME = 'eclipsefdn-github-sync'
     CONTAINER_NAME = 'eclipsefdn-github-sync'
+    GL_IMAGE_NAME = 'eclipsefdn/eclipsefdn-gitlab-sync'
+    GL_CRONJOB_NAME = 'eclipsefdn-gitlab-sync'
+    GL_CONTAINER_NAME = 'eclipsefdn-gitlab-sync'
     TAG_NAME = sh(
       script: """
         GIT_COMMIT_SHORT=\$(git rev-parse --short ${env.GIT_COMMIT})
@@ -49,6 +52,7 @@ pipeline {
       steps {
         sh '''
           docker build --pull -t ${IMAGE_NAME}:${TAG_NAME} -t ${IMAGE_NAME}:latest .
+          docker build --pull -t ${GL_IMAGE_NAME}:${TAG_NAME} -t ${GL_IMAGE_NAME}:latest -f Dockerfile.gitlab .
         '''
       }
     }
@@ -62,6 +66,8 @@ pipeline {
           sh '''
             docker push ${IMAGE_NAME}:${TAG_NAME}
             docker push ${IMAGE_NAME}:latest
+            docker push ${GL_IMAGE_NAME}:${TAG_NAME}
+            docker push ${GL_IMAGE_NAME}:latest
           '''
         }
       }
@@ -81,6 +87,14 @@ pipeline {
                 exit 1
               else 
                 kubectl set image "cronjob.v1beta1.batch/${CRONJOB_NAME}" -n "${NAMESPACE}" "${CONTAINER_NAME}=${IMAGE_NAME}:${TAG_NAME}" --record=true
+              fi
+              
+              GL_CRONJOB="$(kubectl get cronjob ${GL_CRONJOB_NAME} -n "${NAMESPACE}" -o json)"
+              if [[ $(echo "${GL_CRONJOB}" | jq -r 'length') -eq 0 ]]; then
+                echo "ERROR: Unable to find a cronjob to patch matching name '${GL_CRONJOB_NAME}' in namespace ${NAMESPACE}"
+                exit 1
+              else 
+                kubectl set image "cronjob.v1beta1.batch/${GL_CRONJOB_NAME}" -n "${NAMESPACE}" "${GL_CONTAINER_NAME}=${GL_IMAGE_NAME}:${TAG_NAME}" --record=true
               fi
             '''
           }

@@ -1,0 +1,75 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: eclipsefdn-gitlab-sync
+  namespace: foundation-internal-webdev-apps
+spec:
+  schedule: "5 */2 * * *"
+  # if it is time for a new job run and the previous job run hasn’t finished yet, the cron job skips the new job run
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: eclipsefdn-gitlab-sync
+            image: eclipsefdn/eclipsefdn-gitlab-sync:latest
+            imagePullPolicy: Always # TODO: change to IfNotPresent once the deploy step is integrated into CD
+            args:
+            - /bin/sh
+            - -c
+            - npm start -- --verbose=true | tee -a /app/logs/gitlab-stdout-$(date +%Y-%m-%d).log
+            volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+            - name: cache
+              mountPath: /app/.cache
+            - name: gitlab-sync-secrets
+              mountPath: "/run/secrets/access-token"
+              readOnly: true
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              subPath: access-token
+          restartPolicy: Never
+          volumes:
+          - name: logs
+            persistentVolumeClaim:
+              claimName: gitlab-sync-logs
+          - name: cache
+            emptyDir: {}
+          - name: gitlab-sync-secrets
+            secret:
+              secretName: gitlab-sync-secrets
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              items:
+              - key: access-token
+                path: access-token
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: gitlab-sync-logs
+  annotations:
+    volume.beta.kubernetes.io/mount-options: rw,nfsvers=3,noexec
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  claimRef:
+    namespace: foundation-internal-webdev-apps
+    name: gitlab-sync-logs
+  nfs:
+    server: fred
+    path: /opt/export/eclipsefdn-gitlab-sync/logs
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: gitlab-sync-logs
+  namespace: foundation-internal-webdev-apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
