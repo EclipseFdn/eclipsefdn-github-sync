@@ -73,7 +73,7 @@ async function run(secret) {
 
 	// get raw project data and post process to add additional context
 	var data = await eApi.eclipseAPI();
-	data = eApi.postprocessEclipseData(data);
+	data = eApi.postprocessEclipseData(data, "gitlab_repos");
 	
 	// get the bots for the projects
 	var rawBots = await eApi.eclipseBots();
@@ -148,8 +148,8 @@ async function run(secret) {
 		
 		// for each of the repos in the Eclipse project, ensure there is a GL
 		// project
-		for (var repoIdx in project.github_repos) {
-			var extRepo = project.github_repos[repoIdx];
+		for (var repoIdx in project.gitlab_repos) {
+			var extRepo = project.gitlab_repos[repoIdx];
 			if (extRepo == undefined || extRepo.repo == undefined || extRepo.org == undefined) {
 				continue;
 			}

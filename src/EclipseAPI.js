@@ -33,13 +33,17 @@ module.exports = function() {
 	  return data;
 	};
 
-	this.postprocessEclipseData = function(data) {
+	this.postprocessEclipseData = function(data, param) {
 	  for (var key in data) {
 	    var project = data[key];
 	    // add post processing fields
 	    project.pp_repos = [];
 	    project.pp_orgs = [];
-	    var repos = project.github_repos;
+	    var repos = project[param];
+	    if (repos.length == 0) {
+	    	delete data[key];
+	    	continue;
+	    }
 	    for (var idx in repos) {
 	      var repo = repos[idx];
 	      var repoUrl = repo.url;
