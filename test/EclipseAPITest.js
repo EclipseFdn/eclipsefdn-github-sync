@@ -45,7 +45,7 @@ describe('EclipseAPI', function() {
 							"url": "http://www.github.com/second-org/cool-code"
 						}
 					]
-				}]);
+				}], "github_repos");
 			});
 
 			it('should contain repos at root level of project', function() {
