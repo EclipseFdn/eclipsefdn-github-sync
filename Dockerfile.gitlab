@@ -18,8 +18,8 @@ ARG DRYRUN=false
 ENV DRYRUN ${DRYRUN:-false}
 ARG PROVIDER=oauth2_generic
 ENV PROVIDER ${PROVIDER:-oauth2_generic}
-ARG HOST=https://gitlab.eclipse.org
-ENV HOST ${HOST:-https://gitlab.eclipse.org}
+ARG HOST=https://gitlab-test.eclipse.org
+ENV HOST ${HOST:-https://gitlab-test.eclipse.org}
 
 ## Copy NPM configs and install dependencies
 COPY package*.json ./

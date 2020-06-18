@@ -15,7 +15,7 @@ var argv = require('yargs')
   .option('H', {
     alias: 'host',
     description: 'GitLab host base URL',
-    default: 'http://gitlab-test.eclipse.org/'
+    default: 'http://gitlab.eclipse.org/'
   })
   .option('p', {
     alias: 'provider',
