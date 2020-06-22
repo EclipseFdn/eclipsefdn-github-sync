@@ -53,6 +53,7 @@ module.exports = function() {
 	      var match = /.*\/([^\/]+)\/([^\/]+)\/?$/.exec(repoUrl);
 	      // check to make sure we got a match
 	      if (match == null) {
+            console.log(`No match for URL ${repoUrl}`);
 	        continue;
 	      }
 	      
@@ -63,9 +64,11 @@ module.exports = function() {
 	      repo.org = org;
 	      repo.repo = repoName;
 	      if (project.pp_orgs.indexOf(org) == -1) {
+              console.log(`Found new match, registered org=${org}`);
 	    	  project.pp_orgs.push(org);
 	      }
 	      if (project.pp_repos.indexOf(repoName) == -1) {
+              console.log(`Found match, registered repo=${repoName}`);
 	    	  project.pp_repos.push(repoName);
 	      }
 	    }

@@ -88,18 +88,12 @@ async function run(secret) {
 	for (var groupIdx in groups) {
 		namedGroups[groups[groupIdx].name] = groups[groupIdx];
 	}
-	groups = undefined;
-	
-	var pCount = 0;
 	for (var projectIdx in projects) {
 		namedProjects[projects[projectIdx].name] = projects[projectIdx];
 	}
-	projects = null;
-	
 	for (var userIdx in users) {
 		namedUsers[users[userIdx].username] = users[userIdx];
 	}
-	users = null;
 	
 	// fetch org group from results, create if missing
 	console.log('Starting sync');
@@ -136,7 +130,7 @@ async function run(secret) {
 			var uname = usernames[usernameIdx];
 			var user = await getUser(uname, userList[uname].url);
 			if (user == undefined) {
-				console.log(`Could not retrieve user for UID '${uname}, skipping'`);
+				console.log(`Could not retrieve user for UID '${uname}', skipping`);
 				continue;
 			}
 
@@ -153,10 +147,11 @@ async function run(secret) {
 			if (extRepo == undefined || extRepo.repo == undefined || extRepo.org == undefined) {
 				continue;
 			}
-			console.log(`Checking repo '${extRepo.url}'`);
-			
+            if (argv.V) {
+			    console.log(`Processing repo '${extRepo.url}'`);
+			}
 			// retrieving current project
-			var p = await getProject(extRepo.repo, extRepo.url, projGroup);
+			var p = await getProject(extRepo.repo, projGroup);
 			if (p != undefined) console.log(`Project with ID ${p.id} created for repository target ${extRepo.url}`);
 		}
 	}
@@ -207,7 +202,7 @@ async function addUserToGroup(user, group, perms) {
 			if (members[memberIdx].access_level != perms) {
 				// skip if dryrun
 				if (argv.d) {
-					console.log(`Dryrun flag active, would have removed user '${members[memberIdx].username}' from group '${group.name}'`);
+					console.log(`Dryrun flag active, would have updated user '${members[memberIdx].username}' in group '${group.name}'`);
 					return;
 				}
 
@@ -256,7 +251,7 @@ async function addUserToGroup(user, group, perms) {
 	}
 }
 
-async function getProject(name, url, parent) {
+async function getProject(name, parent) {
 	if (name.trim() == ".github") {
 		console.log("Skipping project with name '.github'. No current equivalent to default repository in GitLab.");
 		return;
