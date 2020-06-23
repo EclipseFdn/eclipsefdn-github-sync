@@ -22,6 +22,11 @@ var argv = require('yargs')
     description: 'The OAuth provider name set in GitLab',
     default: 'oauth2_eclipse'
   })
+  .option('s', {
+    alias: 'secretLocation',
+    description: 'The location of the access-token file containing an API access token',
+    default: '/run/secrets'
+  })
   .help('h')
   .alias('h', 'help')
   .version('0.1')
@@ -55,7 +60,7 @@ _prepareSecret();
  */
 function _prepareSecret() {
   //retrieve the secret API token
-  fs.readFile('/run/secrets/access-token', {encoding: 'utf-8'}, function(err,data){
+  fs.readFile(argv.s + '/access-token', {encoding: 'utf-8'}, function(err,data){
      if (!err && data != undefined) {
          run(data.trim());
      } else {
@@ -110,14 +115,14 @@ async function run(secret) {
 	for (projectIdx in data) {
 		
 		var project = data[projectIdx];
-		console.log(`Processing '${project.project_id}'`);	
+		console.log(`Processing '${project.short_project_id}'`);	
 		// fetch project group from results, create if missing
-		var projGroup = await getGroup(project.name, project.project_id, g);
+		var projGroup = await getGroup(project.name, project.short_project_id, g);
 		if (projGroup == undefined) {
 			if (argv.d) {
-				console.log(`Unable to continue processing project with ID '${project.project_id}'. Group does not exist and dryrun has been set.`);
+				console.log(`Unable to continue processing project with ID '${project.short_project_id}'. Group does not exist and dryrun has been set.`);
 			} else {
-				console.log(`Unable to continue processing project with ID '${project.project_id}'. Group does not exist and could not be created.`);
+				console.log(`Unable to continue processing project with ID '${project.short_project_id}'. Group does not exist and could not be created.`);
 			}
 			continue;
 		}
@@ -367,7 +372,7 @@ async function getUser(uname, url) {
 			"password": uuid.v4(),
 			"force_random_password": true,
 			"name": `${data.first_name} ${data.last_name}`,
-			"email": `martin.lowe+${uuid.v4()}@eclipse-foundation.org`,
+			"email": `${data.uid}+${data.name}@users.noreply.eclipse.org`,
 			"extern_uid": data.uid,
 			"provider": argv.p,
 			"skip_confirmation": true
