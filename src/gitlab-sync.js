@@ -91,7 +91,7 @@ async function run(secret) {
 	
 	// map the groups/projects/users to their name
 	for (var groupIdx in groups) {
-		namedGroups[groups[groupIdx].name] = groups[groupIdx];
+		namedGroups[sanitizeGroupName(groups[groupIdx].path)] = groups[groupIdx];
 	}
 	for (var projectIdx in projects) {
 		namedProjects[projects[projectIdx].name] = projects[projectIdx];
@@ -304,7 +304,7 @@ async function getProject(name, parent) {
 }
 
 async function getGroup(name, path, parent, visibility = "public") {
-	var g = namedGroups[name];
+	var g = namedGroups[sanitizeGroupName(path)];
 	if (g == undefined) {
 		console.log(`Creating new group with name '${name}'`);
 		var opts = {
@@ -342,7 +342,7 @@ async function getGroup(name, path, parent, visibility = "public") {
 			console.log(`Created group: ${JSON.stringify(g)}`);
 		}
 		// set it back
-		namedGroups[name] = g;
+		namedGroups[sanitizeGroupName(path)] = g;
 	}
 	return g;
 }
