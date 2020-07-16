@@ -39,11 +39,10 @@ const fs = require('fs');
 
 const { Gitlab } = require('gitlab');
 const EclipseAPI = require('./EclipseAPI.js');
-const axios = require('axios');
 
 var api;
 
-var eApi = new EclipseAPI();
+var eApi;
 var bots;
 
 var namedGroups = {};
@@ -60,21 +59,32 @@ _prepareSecret();
  */
 function _prepareSecret() {
     //retrieve the secret API token
-    fs.readFile(argv.s + '/access-token', { encoding: 'utf-8' }, function(err, data) {
-        if (!err && data != undefined) {
-            run(data.trim());
-        } else {
-            console.log("Error while reading access token: " + err);
-            return;
-        }
-    });
+    var accessToken, eclipseToken;
+
+    var data = fs.readFileSync(argv.s + '/access-token', { encoding: 'utf-8' });
+    if (data != undefined) {
+        accessToken = data.trim();
+    } else {
+        console.log("Error while reading access token: " + err);
+        return;
+    }
+    // retrieve the Eclipse API token (needed for emails)
+    data = fs.readFileSync(argv.s + '/eclipse-oauth-config', { encoding: 'utf-8' });
+    if (data != undefined) {
+        eclipseToken = data.trim();
+    } else {
+        console.log("Error while reading Eclipse OAuth config: " + err);
+        return;
+    }
+    run(accessToken, eclipseToken);
 }
 
-async function run(secret) {
+async function run(secret, eclipseToken) {
     api = new Gitlab({
         host: argv.H,
         token: secret,
     });
+    eApi = new EclipseAPI(JSON.parse(eclipseToken));
 
     // get raw project data and post process to add additional context
     var data = await eApi.eclipseAPI();
@@ -366,7 +376,7 @@ async function getUser(uname, url) {
         }
 
         // retrieve user data
-        var data = await axios.get(url).then(result => result.data).catch(err => console.log(err));
+        var data = await eApi.eclipseUser(uname);
         if (data == undefined) {
             console.log(`Cannot create linked user account for '${uname}', no external data found`);
             return;
@@ -377,7 +387,7 @@ async function getUser(uname, url) {
             "password": uuid.v4(),
             "force_random_password": true,
             "name": `${data.first_name} ${data.last_name}`,
-            "email": `${data.uid}+${data.name}@users.noreply.eclipse.org`,
+            "email": data.mail,
             "extern_uid": data.uid,
             "provider": argv.p,
             "skip_confirmation": true
