@@ -6,7 +6,7 @@ module.exports = class EclipseAPI {
     #config;
     #client;
     #accessToken;
-    constructor(config) {
+    constructor(config = {}) {
         this.#config = config;
         // if we have oauth config, intialize access token
         if (this.#config.oauth !== undefined) {

@@ -1,4 +1,4 @@
-FROM node:10
+FROM node:12
 WORKDIR /app
 ARG VERBOSE_VAL=false
 ENV VERBOSE_VAL ${VERBOSE_VAL:-false}

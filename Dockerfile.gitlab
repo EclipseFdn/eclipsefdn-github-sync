@@ -10,7 +10,7 @@
 # docker run -i --rm -v <full path to a file folder>:/run/secrets eclipsefdn/gitlab-sync
 #
 ###
-FROM node:10
+FROM node:12
 WORKDIR /app
 ARG VERBOSE_VAL=false
 ENV VERBOSE_VAL ${VERBOSE_VAL:-false}
