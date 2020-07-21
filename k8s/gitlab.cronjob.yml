@@ -39,6 +39,11 @@ spec:
               readOnly: true
               # workaround https://github.com/kubernetes/kubernetes/issues/65835
               subPath: access-token
+            - name: gitlab-sync-secrets
+              mountPath: "/run/secrets/eclipse-oauth-config"
+              readOnly: true
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              subPath: eclipse-oauth-config
           restartPolicy: Never
           volumes:
           - name: logs
@@ -53,6 +58,8 @@ spec:
               items:
               - key: access-token
                 path: access-token
+              - key: eclipse-oauth-config
+                path: eclipse-oauth-config
 ---
 apiVersion: v1
 kind: PersistentVolume

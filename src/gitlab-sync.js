@@ -20,7 +20,7 @@ var argv = require('yargs')
     .option('p', {
         alias: 'provider',
         description: 'The OAuth provider name set in GitLab',
-        default: 'oauth2_eclipse'
+        default: 'oauth2_generic'
     })
     .option('s', {
         alias: 'secretLocation',
