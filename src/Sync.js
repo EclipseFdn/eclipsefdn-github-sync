@@ -116,7 +116,7 @@ async function _init(secret) {
       } else {
         url = links.next.url;
       }
-      return result.data;
+      return r.data;
     }).catch(err => console.log(`Error while retrieving results from Eclipse Projects API (${url}): ${err}`));
     
     // collect the results
