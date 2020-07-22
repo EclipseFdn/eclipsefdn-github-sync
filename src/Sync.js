@@ -108,16 +108,16 @@ async function _init(secret) {
   while (hasMore) {
     console.log('Loading next page...');
     // get the current page of results, incrementing page count after call
-    result = await axios.get(url).then(result => {
+    result = await axios.get(url).then(r => {
       // return the data to the user
-      var links = parse(result.headers.link);
+      var links = parse(r.headers.link);
       if (links.self.url == links.last.url) {
         hasMore = false;
       } else {
         url = links.next.url;
       }
       return result.data;
-    }).catch(err => logError(err, 'team:list'));
+    }).catch(err => console.log(`Error while retrieving results from Eclipse Projects API (${url}): ${err}`));
     
     // collect the results
     if (result != null && result.length > 0) {
