@@ -60,7 +60,7 @@ spec:
                 path: access-token
           - name: gitlab-sync-secrets-oauth
             secret:
-              secretName: gitlab-sync-secrets
+              secretName: gitlab-sync-secrets-oauth
               # workaround https://github.com/kubernetes/kubernetes/issues/65835
               items:
               - key: eclipse-oauth-config
