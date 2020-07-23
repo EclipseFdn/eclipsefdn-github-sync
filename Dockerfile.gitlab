@@ -29,4 +29,4 @@ RUN npm install
 COPY ./src/* ./src/
 
 ## run the script
-CMD npm run lab-sync -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --provider=$PROVIDER --host=$HOST
+CMD npm run lab-sync -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --provider=$PROVIDER --host=$HOST --tls-min-v1.0

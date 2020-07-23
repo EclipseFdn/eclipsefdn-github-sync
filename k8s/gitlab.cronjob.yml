@@ -28,7 +28,7 @@ spec:
             args:
             - /bin/sh
             - -c
-            - npm run lab-sync -- --verbose=true --host=https://gitlab.eclipse.org 2>&1 | tee -a /app/logs/gitlab-stdout-$(date +%Y-%m-%d).log
+            - npm run lab-sync -- --verbose=true --tls-min-v1.0 --host=https://gitlab.eclipse.org 2>&1 | tee -a /app/logs/gitlab-stdout-$(date +%Y-%m-%d).log
             volumeMounts:
             - name: logs
               mountPath: /app/logs

@@ -15,4 +15,4 @@ RUN npm install
 COPY ./src/* ./src/
 
 ## run the script
-CMD npm start -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --deletionDryRun=$DRYRUN_DELETION
+CMD npm start -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --deletionDryRun=$DRYRUN_DELETION --tls-min-v1.0
