@@ -47,6 +47,41 @@
 		"teamName": "eclipsefdn-staff",
 		"members": [
 			{
+				"name": "pbuckd40",
+				"url": "https://api.eclipse.org/account/profile/pbuckd40",
+				"expiration": ""
+			},
+			{
+				"name": "zfazli",
+				"url": "https://api.eclipse.org/account/profile/zfazli",
+				"expiration": ""
+			}
+			{
+				"name": "imaftei",
+				"url": "https://api.eclipse.org/account/profile/imaftei",
+				"expiration": ""
+			},
+			{
+				"name": "vgriffiths",
+				"url": "https://api.eclipse.org/account/profile/vgriffiths",
+				"expiration": ""
+			},
+			{
+				"name": "kmcnaughton",
+				"url": "https://api.eclipse.org/account/profile/kmcnaughton",
+				"expiration": ""
+			},
+			{
+				"name": "jharrisj1m",
+				"url": "https://api.eclipse.org/account/profile/jharrisj1m",
+				"expiration": ""
+			},
+			{
+				"name": "hkellytc5",
+				"url": "https://api.eclipse.org/account/profile/hkellytc5",
+				"expiration": ""
+			},
+			{
 				"name": "malowe",
 				"url": "https://api.eclipse.org/account/profile/malowe",
 				"expiration": ""
@@ -64,6 +99,11 @@
 			{
 				"name": "webdev",
 				"url": "https://api.eclipse.org/account/profile/webdev",
+				"expiration": ""
+			},
+			{
+				"name": "webmaster",
+				"url": "https://api.eclipse.org/account/profile/webmaster",
 				"expiration": ""
 			},
 			{
@@ -114,6 +154,11 @@
 			{
 				"name": "bking18m",
 				"url": "https://api.eclipse.org/account/profile/bking18m",
+				"expiration": ""
+			}
+			{
+				"name": "yiliu",
+				"url": "https://api.eclipse.org/account/profile/yiliu",
 				"expiration": ""
 			}
 		],
