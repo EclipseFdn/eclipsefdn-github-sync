@@ -568,7 +568,7 @@ module.exports = class {
 
     console.log(`Getting invited members for key: ${cacheKey}`);
     // fetch if we don't have a cached result
-    if (cachedResult === null) {
+    if (cachedResult === undefined) {
       // loop through all available users, and add them to a list to be
       // returned
       var options = octokit.orgs.listOutsideCollaborators.endpoint.merge({
@@ -590,7 +590,7 @@ module.exports = class {
       console.log(`Found cached result for key ${cacheKey}`);
 
       // return result to be immediately used
-      return Array.from(cachedResult);
+      return Array.from(cachedResult | {});
     }
   }
 

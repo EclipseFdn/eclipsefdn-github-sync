@@ -151,7 +151,7 @@ async function runSync(data) {
     console.log(`Project ID: ${projectID}`);
 
     // maintain orgs used by this project
-    var orgs = processRepositories(repos, project);
+    var orgs = await processRepositories(repos, project);
     // check if org has been processed earlier
     for (var orgIdx in orgs) {
       var org = orgs[orgIdx];
@@ -181,7 +181,7 @@ async function runSync(data) {
 
 async function processRepositories(repos, project) {
   if (argv.V === true) {
-    console.log(`Sync:processRepositories(repos = ${repos}, project = ${JSON.stringify(project)})`);
+    console.log(`Sync:processRepositories(repos = ${JSON.stringify(repos)}, project = ${JSON.stringify(project)})`);
   }
   var orgs = [];
   for (var idx in repos) {
@@ -199,7 +199,10 @@ async function processRepositories(repos, project) {
     }
 
     // process contributors for the team
-    await removeRepoExternalContributors(project, org, repoName);
+    var successfullyUpdatedExt = await removeRepoExternalContributors(project, org, repoName);
+    if (argv.V === true) {
+      console.log(`Updated external contributors: ${successfullyUpdatedExt}`);
+    }
     if (!argv.d) {
       try {
         // Ensure that the teams refer to the repo
@@ -207,9 +210,9 @@ async function processRepositories(repos, project) {
         var updatedContrib = await wrap.addRepoToTeam(org, `${project.project_id}-contributors`, repoName, 'triage');
         var updatedPL = await wrap.addRepoToTeam(org, `${project.project_id}-project-leads`, repoName, 'maintain');
         if (argv.V === true) {
-          console.log(`Updated commit team: ${JSON.stringify(updatedCommit)}`);
-          console.log(`Updated contrib team: ${JSON.stringify(updatedContrib)}`);
-          console.log(`Updated pl team: ${JSON.stringify(updatedPL)}`);
+          console.log(`Attempted update commit team: ${updatedCommit === undefined}`);
+          console.log(`Attempted update contrib team: ${updatedContrib === undefined}`);
+          console.log(`Attempted update pl team: ${updatedPL === undefined}`);
         }
       } catch (e) {
         console.log(`Error while updating ${project.project_id}. \n${e}`);
@@ -316,7 +319,7 @@ async function updateProjectTeam(org, project, grouping) {
 
 async function updateTeam(org, teamName, designatedMembers) {
   if (argv.V === true) {
-    console.log(`Sync:updateTeam(org = ${org}, teamName = ${teamName}, designatedMembers = ${designatedMembers})`);
+    console.log(`Sync:updateTeam(org = ${org}, teamName = ${teamName}, designatedMembers = ${JSON.stringify(designatedMembers)})`);
   }
   console.log(`Syncing team '${teamName}' for organization ${org}`);
   var team = await wrap.addTeam(org, teamName);
@@ -389,14 +392,13 @@ async function removeRepoExternalContributors(project, org, repo) {
   }
   // get the collaborators
   var collaborators = await wrap.getRepoCollaborators(org, repo);
-  Atomics.wait(int32, 0, 0, waitTimeInMS);
   if (collaborators === undefined) {
     console.log(`Error while fetching collaborators for ${org}/${repo}`);
-    return;
+    return false;
   }
   // check if we have collaborators to process
   if (collaborators.length === 0) {
-    return;
+    return false;
   }
 
   var projBots = bots[project.project_id];
@@ -442,6 +444,7 @@ async function removeRepoExternalContributors(project, org, repo) {
       console.log(`Dry run set, would have removing user '${uname}' from collaborators on ${org}/${repo}`);
     }
   }
+  return true;
 }
 
 
