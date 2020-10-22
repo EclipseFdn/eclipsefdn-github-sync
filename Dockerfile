@@ -7,12 +7,12 @@ ENV DRYRUN ${DRYRUN:-false}
 ARG DRYRUN_DELETION=false
 ENV DRYRUN_DELETION ${DRYRUN_DELETION:-false}
 
+## Copy over required script files
+COPY src src/
+
 ## Copy NPM configs and install dependencies
 COPY package*.json ./
-RUN npm install
-
-## Copy over required script files
-COPY ./src/ ./src/
+RUN npm ci
 
 ## run the script
 CMD npm start -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --deletionDryRun=$DRYRUN_DELETION --tls-min-v1.0

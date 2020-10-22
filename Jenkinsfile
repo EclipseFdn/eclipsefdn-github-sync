@@ -52,8 +52,8 @@ pipeline {
       }
       steps {
         sh '''
-          docker build --no-cache --pull -t ${IMAGE_NAME}:${TAG_NAME} -t ${IMAGE_NAME}:latest .
-          docker build --no-cache --pull -t ${GL_IMAGE_NAME}:${TAG_NAME} -t ${GL_IMAGE_NAME}:latest -f Dockerfile.gitlab .
+          docker build --pull -t ${IMAGE_NAME}:${TAG_NAME} -t ${IMAGE_NAME}:latest .
+          docker build --pull -t ${GL_IMAGE_NAME}:${TAG_NAME} -t ${GL_IMAGE_NAME}:latest -f Dockerfile.gitlab .
         '''
       }
     }
