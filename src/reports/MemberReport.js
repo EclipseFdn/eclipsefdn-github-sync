@@ -95,6 +95,9 @@ async function run(secret) {
     console.log(`Starting processing: ${team.slug}`);
     // get the members for the current team
     var members = await wrap.getTeamMembers(argv.o, team);
+    if (members === undefined) {
+      continue;
+    }
 
     // create secondary list to modify while looping
     var s = [];

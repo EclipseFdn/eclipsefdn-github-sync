@@ -244,6 +244,9 @@ module.exports = class {
 
     // check if the user already exists in the team
     var teamMembers = await getTeamMembers(org, teamData);
+    if (teamMembers === undefined) {
+      return;
+    }
     for (var i = 0; i < teamMembers.length; i++) {
       if (teamMembers[i].login === uname) {
         console.log(`User with usernmae '${uname}' is already a member of ${org}/${sanitizedTeam}`);
@@ -288,6 +291,9 @@ module.exports = class {
 
     // check if the user already exists in the team
     var teamMembers = await getTeamMembers(org, teamData);
+    if (teamMembers === undefined) {
+      return;
+    }
     var isMember = false;
     for (var i = 0; i < teamMembers.length; i++) {
       if (teamMembers[i].login === uname) {
@@ -578,7 +584,7 @@ module.exports = class {
         .then(result => result)
         .catch(err => logError(err, 'orgs:listOutsideCollaborators'));
       if (data === undefined) {
-        return null;
+        return undefined;
       }
 
       // save the data to cache to avoid reprocessing
@@ -616,7 +622,7 @@ module.exports = class {
         .then(result => result)
         .catch(err => logError(err, 'team:listCollaborators'));
       if (data === undefined) {
-        return null;
+        return undefined;
       }
 
       // save the data to cache to avoid reprocessing
@@ -880,7 +886,7 @@ async function getTeamMembers(org, team) {
       .then(result => result)
       .catch(err => logError(err, 'team:listMembers'));
     if (data === undefined) {
-      return null;
+      return undefined;
     }
 
     // save the data to cache to avoid reprocessing
