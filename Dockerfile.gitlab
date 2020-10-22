@@ -21,12 +21,12 @@ ENV PROVIDER ${PROVIDER:-oauth2_generic}
 ARG HOST=https://gitlab-test.eclipse.org
 ENV HOST ${HOST:-https://gitlab-test.eclipse.org}
 
+## Copy over required script files
+COPY src src/
+
 ## Copy NPM configs and install dependencies
 COPY package*.json ./
-RUN npm install
-
-## Copy over required script files
-COPY ./src/* ./src/
+RUN npm ci
 
 ## run the script
 CMD npm run lab-sync -- --verbose=$VERBOSE_VAL --dryrun=$DRYRUN --provider=$PROVIDER --host=$HOST --tls-min-v1.0
