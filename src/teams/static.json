@@ -160,6 +160,11 @@
 				"name": "yiliu",
 				"url": "https://api.eclipse.org/account/profile/yiliu",
 				"expiration": ""
+			},
+			{
+				"name": "sgiacomoni2as",
+				"url": "https://api.eclipse.org/account/profile/sgiacomoni2as",
+				"expiration": ""
 			}
 		],
 		"permission": "TRIAGE",
