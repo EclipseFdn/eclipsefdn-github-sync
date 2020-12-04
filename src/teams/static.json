@@ -165,6 +165,11 @@
 				"name": "sgiacomoni2as",
 				"url": "https://api.eclipse.org/account/profile/sgiacomoni2as",
 				"expiration": ""
+			},
+			{
+				"name": "mkokabi",
+				"url": "https://api.eclipse.org/account/profile/mkokabi",
+				"expiration": ""
 			}
 		],
 		"permission": "TRIAGE",
