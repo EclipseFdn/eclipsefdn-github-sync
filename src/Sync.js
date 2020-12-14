@@ -367,20 +367,11 @@ async function updateTeam(org, teamName, designatedMembers) {
   // handle
   if (members !== undefined) {
     for (var i = 0; i < members.length; i++) {
-      var url = `https://api.eclipse.org/github/profile/${members[i].login}`;
-      var r = await axios.get(url).then(result => {
-        return result.data;
-      }).catch(err => console.log(`Received error from Eclipse API querying for '${url}': ${err}`));
-      // check that we know the user before removing
-      if (r !== undefined && r['github_handle'] === members[i].login) {
-        if (argv.D !== true) {
-          console.log(`Removing '${members[i].login}' from team '${teamName}'`);
-          await wrap.removeUserFromTeam(org, teamName, members[i].login);
-        } else {
-          console.log(`Would have deleted '${members[i].login}', but in semi-dry run mode`);
-        }
+      if (argv.D !== true) {
+        console.log(`Removing '${members[i].login}' from team '${teamName}'`);
+        await wrap.removeUserFromTeam(org, teamName, members[i].login);
       } else {
-        console.log(`Could not identify '${members[i].login}' from team '${teamName}', skipping`);
+        console.log(`Would have deleted '${members[i].login}', but in semi-dry run mode`);
       }
     }
   }
