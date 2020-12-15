@@ -527,7 +527,7 @@ function sanitizeGroupName(pid) {
     console.log(`GitlabSync:sanitizeGroupName(pid = ${pid})`);
   }
   if (pid !== undefined) {
-    return pid.toLowerCase().replace(/[^\s\da-zA-Z-\.]/g, '-');
+    return pid.toLowerCase().replace(/[^\s\da-zA-Z-.]/g, '-');
   }
   return '';
 }
