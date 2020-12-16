@@ -57,11 +57,6 @@
 				"expiration": ""
 			},
 			{
-				"name": "imaftei",
-				"url": "https://api.eclipse.org/account/profile/imaftei",
-				"expiration": ""
-			},
-			{
 				"name": "vgriffiths",
 				"url": "https://api.eclipse.org/account/profile/vgriffiths",
 				"expiration": ""
