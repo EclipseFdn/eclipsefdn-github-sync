@@ -50,6 +50,9 @@ const { SecretReader, getBaseConfig } = require('./SecretReader.js');
 const { Gitlab } = require('gitlab');
 const EclipseAPI = require('./EclipseAPI.js');
 
+const { getLogger } = require('./logger.js');
+let logger = getLogger(argv.V ? 'debug' : 'info');
+
 var api;
 var eApi;
 var bots;
@@ -84,10 +87,10 @@ function _prepareSecret() {
       eclipseToken = data.trim();
       run(accessToken, eclipseToken);
     } else {
-      console.log('Could not find the Eclipse OAuth config, exiting');
+      logger.error('Could not find the Eclipse OAuth config, exiting');
     }
   } else {
-    console.log('Could not find the GitLab access token, exiting');
+    logger.error('Could not find the GitLab access token, exiting');
   }
 }
 
@@ -124,13 +127,13 @@ async function run(secret, eclipseToken) {
   }
 
   // fetch org group from results, create if missing
-  console.log('Starting sync');
+  logger.info('Starting sync');
   var g = await getGroup('Eclipse', 'eclipse', undefined);
   if (g === undefined) {
     if (argv.d) {
-      console.log('Unable to start sync of GitLab content. Base Eclipse group could not be found and dryrun is set');
+      logger.error('Unable to start sync of GitLab content. Base Eclipse group could not be found and dryrun is set');
     } else {
-      console.log('Unable to start sync of GitLab content. Base Eclipse group could not be created');
+      logger.errpr('Unable to start sync of GitLab content. Base Eclipse group could not be created');
     }
     return;
   }
@@ -141,15 +144,15 @@ async function run(secret, eclipseToken) {
       console.log(`Project target set ('${argv.P}'). Skipping non-matching project ID ${project.short_project_id}`);
       continue;
     }
-    console.log(`Processing '${project.short_project_id}'`);
+    logger.info(`Processing '${project.short_project_id}'`);
     // fetch project group from results, create if missing
     var projGroup = await getGroup(project.name, project.short_project_id, g);
     if (projGroup === undefined) {
       if (argv.d) {
-        console.log(`Unable to continue processing project with ID '${project.short_project_id}'.`
+        logger.warn(`Unable to continue processing project with ID '${project.short_project_id}'.`
           + ' Group does not exist and dryrun has been set.');
       } else {
-        console.log(`Unable to continue processing project with ID '${project.short_project_id}'.`
+        logger.error(`Unable to continue processing project with ID '${project.short_project_id}'.`
           + ' Group does not exist and could not be created.');
       }
       continue;
@@ -163,7 +166,7 @@ async function run(secret, eclipseToken) {
       var uname = usernames[usernameIdx];
       var user = await getUser(uname, userList[uname].url);
       if (user === undefined) {
-        console.log(`Could not retrieve user for UID '${uname}', skipping`);
+        logger.verbose(`Could not retrieve user for UID '${uname}', skipping`);
         continue;
       }
 
@@ -181,12 +184,12 @@ async function run(secret, eclipseToken) {
         continue;
       }
       if (argv.V) {
-        console.log(`Processing repo '${extRepo.url}'`);
+        logger.debug(`Processing repo '${extRepo.url}'`);
       }
       // retrieving current project
       var p = await getProject(extRepo.repo, projGroup);
       if (p !== undefined) {
-        console.log(`Project with ID ${p.id} created for repository target ${extRepo.url}`);
+        logger.info(`Project with ID ${p.id} created for repository target ${extRepo.url}`);
       }
     }
   }
@@ -194,12 +197,12 @@ async function run(secret, eclipseToken) {
 
 async function removeAdditionalUsers(expectedUsers, group, projectID) {
   if (argv.V) {
-    console.log(`GitlabSync:removeAdditionalUsers(expectedUsers = ${expectedUsers}, group = ${group}, projectID = ${projectID})`);
+    logger.debug(`GitlabSync:removeAdditionalUsers(expectedUsers = ${expectedUsers}, group = ${group}, projectID = ${projectID})`);
   }
   // get the current list of users for the group
   var members = await getGroupMembers(group);
   if (members === undefined) {
-    console.log(`Could not find any group members for ID ${group.id}'. Skipping user removal check`);
+    logger.warn(`Could not find any group members for ID ${group.id}'. Skipping user removal check`);
     return;
   }
 
@@ -208,21 +211,21 @@ async function removeAdditionalUsers(expectedUsers, group, projectID) {
   for (var memberIdx in members) {
     var member = members[memberIdx];
     // check access and ensure user isn't an owner
-    console.log(`Checking user '${member.username}' access to group '${group.name}'`);
+    logger.verbose(`Checking user '${member.username}' access to group '${group.name}'`);
     if (member.access_level !== ADMIN_PERMISSIONS_LEVEL && expectedUsernames.indexOf(member.username) === -1
       && !isBot(member.username, projectID)) {
       if (argv.d) {
-        console.log(`Dryrun flag active, would have removed user '${member.username}' from group '${group.name}'`);
+        logger.info(`Dryrun flag active, would have removed user '${member.username}' from group '${group.name}'`);
         continue;
       }
-      console.log(`Removing user '${member.username}' from group '${group.name}'`);
+      logger.info(`Removing user '${member.username}' from group '${group.name}'`);
       try {
         await api.GroupMembers.remove(group.id, member.id);
       } catch (err) {
         if (argv.V) {
-          console.log(err);
+          logger.error(err);
         }
-        console.log(`Error while removing user '${member.username}' from group '${group.name}'`);
+        logger.warn(`Error while removing user '${member.username}' from group '${group.name}'`);
       }
     }
   }
@@ -243,28 +246,28 @@ function isBot(uname, projectID) {
 
 async function addUserToGroup(user, group, perms) {
   if (argv.V) {
-    console.log(`GitlabSync:addUserToGroup(user = ${user}, group = ${group}, perms = ${perms})`);
+    logger.debug(`GitlabSync:addUserToGroup(user = ${user}, group = ${group}, perms = ${perms})`);
   }
   // get the members for the current group
   var members = await getGroupMembers(group);
   if (members === undefined) {
-    console.log(`Could not find any references to group with ID ${group.id}`);
+    logger.warn(`Could not find any references to group with ID ${group.id}`);
     return;
   }
 
   // check if user is already present
   for (var memberIdx in members) {
     if (members[memberIdx].username === user.username) {
-      console.log(`User '${user.username}' is already a member of ${group.name}`);
+      logger.verbose(`User '${user.username}' is already a member of ${group.name}`);
       if (members[memberIdx].access_level !== perms) {
         // skip if dryrun
         if (argv.d) {
-          console.log(`Dryrun flag active, would have updated user '${members[memberIdx].username}' in group '${group.name}'`);
+          logger.info(`Dryrun flag active, would have updated user '${members[memberIdx].username}' in group '${group.name}'`);
           return;
         }
 
         // modify user, catching errors
-        console.log(`Fixing permission level for user '${user.username}' in group '${group.name}'`);
+        logger.info(`Fixing permission level for user '${user.username}' in group '${group.name}'`);
         try {
           var updatedMember = await api.GroupMembers.edit(group.id, user.id, perms);
           // update inner array
@@ -272,9 +275,9 @@ async function addUserToGroup(user, group, perms) {
           gMems[group.id] = members;
         } catch (err) {
           if (argv.V) {
-            console.log(err);
+            logger.error(err);
           }
-          console.log(`Error while fixing permission level for user '${user.username}' in group '${group.name}'`);
+          logger.warn(`Error while fixing permission level for user '${user.username}' in group '${group.name}'`);
           return;
         }
       }
@@ -284,11 +287,11 @@ async function addUserToGroup(user, group, perms) {
   }
   // check if dry run before updating
   if (argv.d) {
-    console.log(`Dryrun flag active, would have added user '${user.username}' to group '${group.name}' with access level '${perms}'`);
+    logger.info(`Dryrun flag active, would have added user '${user.username}' to group '${group.name}' with access level '${perms}'`);
     return;
   }
 
-  console.log(`Adding '${user.username}' to '${group.name}' group`);
+  logger.info(`Adding '${user.username}' to '${group.name}' group`);
   try {
     // add member to group, track, and return a copy
     var newMember = await api.GroupMembers.add(group.id, user.id, perms);
@@ -299,24 +302,24 @@ async function addUserToGroup(user, group, perms) {
     return JSON.parse(JSON.stringify(newMember));
   } catch (err) {
     if (argv.V) {
-      console.log(err);
+      logger.error(err);
     }
-    console.log(`Error while adding '${user.username}' to '${group.name}' group`);
+    logger.warn(`Error while adding '${user.username}' to '${group.name}' group`);
   }
 }
 
 async function getProject(name, parent) {
   if (argv.V) {
-    console.log(`GitlabSync:getProject(name = ${name}, parent = ${parent})`);
+    logger.debug(`GitlabSync:getProject(name = ${name}, parent = ${parent})`);
   }
   if (name.trim() === '.github') {
-    console.log("Skipping project with name '.github'. No current equivalent to default repository in GitLab.");
+    logger.warn("Skipping project with name '.github'. No current equivalent to default repository in GitLab.");
     return;
   }
 
   var p = namedProjects[getCompositeProjectKey(name, parent.id)];
   if (p === undefined) {
-    console.log(`Creating new project with name '${name}'`);
+    logger.verbose(`Creating new project with name '${name}'`);
     // create the request options for the new user
     var opts = {
       path: name,
@@ -327,27 +330,27 @@ async function getProject(name, parent) {
     }
     // check if dry run before creating new project
     if (argv.d) {
-      console.log(`Dryrun flag active, would have created new project '${name}' with options ${JSON.stringify(opts)}`);
+      logger.info(`Dryrun flag active, would have created new project '${name}' with options ${JSON.stringify(opts)}`);
       return;
     }
 
     // create the new project, and track it
     if (argv.V) {
-      console.log(`Creating project with options: ${JSON.stringify(opts)}`);
+      logger.debug(`Creating project with options: ${JSON.stringify(opts)}`);
     }
     try {
       p = await api.Projects.create(opts);
     } catch (err) {
       if (argv.V) {
-        console.log(err);
+        logger.error(err);
       }
     }
     if (p === null || p instanceof Array) {
-      console.log(`Error while creating project '${name}'`);
+      logger.warn(`Error while creating project '${name}'`);
       return undefined;
     }
     if (argv.V) {
-      console.log(`Created project: ${JSON.stringify(p)}`);
+      logger.debug(`Created project: ${JSON.stringify(p)}`);
     }
     // set it back
     namedProjects[getCompositeProjectKey(name, parent.id)] = p;
@@ -357,11 +360,11 @@ async function getProject(name, parent) {
 
 async function getGroup(name, path, parent, visibility = 'public') {
   if (argv.V) {
-    console.log(`GitlabSync:getGroup(name = ${name}, path = ${path}, parent = ${parent}, visibility = ${visibility})`);
+    logger.debug(`GitlabSync:getGroup(name = ${name}, path = ${path}, parent = ${parent}, visibility = ${visibility})`);
   }
   var g = namedGroups[sanitizeGroupName(path)];
   if (g === undefined) {
-    console.log(`Creating new group with name '${name}'`);
+    logger.verbose(`Creating new group with name '${name}'`);
     var opts = {
       name: name,
       path: sanitizeGroupName(path),
@@ -374,27 +377,27 @@ async function getGroup(name, path, parent, visibility = 'public') {
     }
     // check if dry run before creating group
     if (argv.d) {
-      console.log(`Dryrun flag active, would have created new group '${name}' with options ${JSON.stringify(opts)}`);
+      logger.info(`Dryrun flag active, would have created new group '${name}' with options ${JSON.stringify(opts)}`);
       return;
     }
 
     // if verbose is set display user opts
     if (argv.V) {
-      console.log(`Creating group with options: ${JSON.stringify(opts)}`);
+      logger.debug(`Creating group with options: ${JSON.stringify(opts)}`);
     }
     try {
       g = await api.Groups.create(opts);
     } catch (err) {
       if (argv.V) {
-        console.log(err);
+        logger.error(err);
       }
     }
     if (g === null || g instanceof Array) {
-      console.log(`Error while creating group '${name}'`);
+      logger.warn(`Error while creating group '${name}'`);
       return undefined;
     }
     if (argv.V) {
-      console.log(`Created group: ${JSON.stringify(g)}`);
+      logger.debug(`Created group: ${JSON.stringify(g)}`);
     }
     // set it back
     namedGroups[sanitizeGroupName(path)] = g;
@@ -404,10 +407,10 @@ async function getGroup(name, path, parent, visibility = 'public') {
 
 async function getUser(uname, url) {
   if (argv.V) {
-    console.log(`GitlabSync:getUser(uname = ${uname}, url = ${url})`);
+    logger.debug(`GitlabSync:getUser(uname = ${uname}, url = ${url})`);
   }
   if (url === undefined || url === '') {
-    console.log(`Cannot fetch user information for user '${uname}' with no set URL`);
+    logger.error(`Cannot fetch user information for user '${uname}' with no set URL`);
     return;
   }
 
@@ -421,10 +424,10 @@ async function getUser(uname, url) {
     // retrieve user data
     var data = await eApi.eclipseUser(uname);
     if (data === undefined) {
-      console.log(`Cannot create linked user account for '${uname}', no external data found`);
+      logger.error(`Cannot create linked user account for '${uname}', no external data found`);
       return;
     }
-    console.log(`Creating new user with name '${uname}'`);
+    logger.verbose(`Creating new user with name '${uname}'`);
     var opts = {
       username: uname,
       password: uuid.v4(),
@@ -437,7 +440,7 @@ async function getUser(uname, url) {
     };
     // check if dry run before creating new user
     if (argv.d) {
-      console.log(`Dryrun flag active, would have created new user '${uname}' with options ${JSON.stringify(opts)}`);
+      logger.info(`Dryrun flag active, would have created new user '${uname}' with options ${JSON.stringify(opts)}`);
       return;
     }
 
@@ -446,17 +449,17 @@ async function getUser(uname, url) {
       // copy the object and redact the password for security
       var optLog = JSON.parse(JSON.stringify(opts));
       optLog.password = 'redacted';
-      console.log(`Creating user with options: ${JSON.stringify(optLog)}`);
+      logger.debug(`Creating user with options: ${JSON.stringify(optLog)}`);
     }
     try {
       u = await api.Users.create(opts);
     } catch (err) {
       if (argv.V) {
-        console.log(err);
+        logger.error(err);
       }
     }
     if (u === null) {
-      console.log(`Error while creating user '${uname}'`);
+      logger.warn(`Error while creating user '${uname}'`);
       return undefined;
     }
     // set it back
@@ -467,7 +470,7 @@ async function getUser(uname, url) {
 
 async function getGroupMembers(group) {
   if (argv.V) {
-    console.log(`GitlabSync:getGroupMembers(group = ${group})`);
+    logger.debug(`GitlabSync:getGroupMembers(group = ${group})`);
   }
   var members = gMems[group.id];
   if (members === undefined) {
@@ -475,11 +478,11 @@ async function getGroupMembers(group) {
       members = await api.GroupMembers.all(group.id);
     } catch (err) {
       if (argv.V) {
-        console.log(err);
+        logger.error(err);
       }
     }
     if (members === null) {
-      console.log(`Unable to find group members for group with ID '${group.id}'`);
+      logger.warn(`Unable to find group members for group with ID '${group.id}'`);
       return;
     }
     gMems[group.id] = members;
@@ -493,7 +496,7 @@ async function getGroupMembers(group) {
 
 function getUserList(project) {
   if (argv.V) {
-    console.log(`GitlabSync:getUserList(project = ${JSON.stringify(project)})`);
+    logger.debug(`GitlabSync:getUserList(project = ${JSON.stringify(project)})`);
   }
   var l = {};
   // add the contributors with reporter access
@@ -529,7 +532,7 @@ function getUserList(project) {
 
 function sanitizeGroupName(pid) {
   if (argv.V) {
-    console.log(`GitlabSync:sanitizeGroupName(pid = ${pid})`);
+    logger.debug(`GitlabSync:sanitizeGroupName(pid = ${pid})`);
   }
   if (pid !== undefined) {
     return pid.toLowerCase().replace(/[^\s\da-zA-Z-.]/g, '-');

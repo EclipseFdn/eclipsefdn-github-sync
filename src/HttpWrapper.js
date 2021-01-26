@@ -16,6 +16,7 @@ const DEFAULT_CACHE_TIME = 120;
 
 const axios = require('axios');
 const TimeCache = require('./TimeCache.js');
+const { getLogger } = require('./logger.js');
 
 // variables for use with the cache
 const httpCacheID = 'http.cache';
@@ -26,10 +27,18 @@ class HttpWrapper {
   set verbose(val) {
     if (typeof val === 'boolean') {
       this.#verbose = val;
+      this.#logger = getLogger(this.#verbose ? 'debug' : 'info', 'HttpWrapper');
     }
   }
   get verbose() {
     return this.#verbose;
+  }
+  #logger;
+  set logger(logger) {
+    this.#logger = logger;
+  }
+  get logger() {
+    return this.#logger;
   }
   #cacheTime;
   #httpCache;
@@ -37,49 +46,50 @@ class HttpWrapper {
   constructor(cacheTime) {
     this.#cacheTime = cacheTime | DEFAULT_CACHE_TIME;
     this.#httpCache = new TimeCache(httpCacheID, cacheLoc, this.#cacheTime);
+    this.#logger = getLogger('info', 'HttpWrapper');
   }
 
   getData(url) {
     if (this.#verbose === true) {
-      console.log(`HTTPWrapper:getData(url = ${url})`);
+      this.#logger.debug(`HTTPWrapper:getData(url = ${url})`);
     }
     // check that we haven't retrieved data yet
     var cacheResult = this.#httpCache.getKey(url);
     if (cacheResult != null) {
-      console.log(`Found cached result for endpoint call ${url}`);
+      this.#logger.verbose(`Found cached result for endpoint call ${url}`);
       return cacheResult;
     }
 
     // return promise that returns data after caching it
     return axios.get(url)
       .then(result => {
+        this.#logger.silly(result);
         this.#httpCache.setKey(url, result.data);
-
         return result.data;
       })
-      .catch(err => console.log(err));
+      .catch(err => this.#logger.error(err));
   }
 
   async getRaw(url) {
     if (this.#verbose === true) {
-      console.log(`HTTPWrapper:getRaw(url = ${url})`);
+      this.#logger.debug(`HTTPWrapper:getRaw(url = ${url})`);
     }
     // check that we haven't retrieved data yet
     var cacheResult = this.#httpCache.getKey(url);
     if (cacheResult != null) {
-      console.log(`Found cached result for endpoint call ${url}`);
+      this.#logger.verbose(`Found cached result for endpoint call ${url}`);
       return cacheResult;
     }
 
     // create call that returns error or result raw, no processing
     var raw = await axios.get(url)
       .then(result => {
+        this.#logger.silly(result);
         this.#httpCache.setKey(url, result);
-
         return result;
       })
       .catch(err => {
-        console.log(err);
+        this.#logger.error(err);
         return err;
       });
     return raw;
@@ -87,7 +97,7 @@ class HttpWrapper {
 
   close() {
     if (this.#verbose === true) {
-      console.log('HTTPWrapper:close()');
+      this.#logger.debug('HTTPWrapper:close()');
     }
     this.#httpCache.save(true);
   }

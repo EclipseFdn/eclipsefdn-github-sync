@@ -11,6 +11,7 @@
  SPDX-License-Identifier: EPL-2.0
 ******************************************************************/
 
+const { getLogger } = require('./logger.js');
 const fs = require('fs');
 const baseConfig = {
   root: '/run/secrets/',
@@ -31,10 +32,18 @@ class SecretReader {
   set verbose(val) {
     if (typeof val === 'boolean') {
       this.#verbose = val;
+      this.#logger = getLogger(this.#verbose ? 'debug' : 'info', 'SecretReader');
     }
   }
   get verbose() {
     return this.#verbose;
+  }
+  #logger;
+  set logger(logger) {
+    this.#logger = logger;
+  }
+  get logger() {
+    return this.#logger;
   }
   #config;
   constructor(config) {
@@ -46,11 +55,12 @@ class SecretReader {
     }
     // throws if there is no access
     fs.accessSync(this.#config.root, fs.constants.R_OK);
+    this.#logger = getLogger('info', 'SecretReader');
   }
 
   readSecret = function(name, encoding = this.#config.encoding) {
     if (this.#verbose === true) {
-      console.log(`SecretReader:readSecret(name = ${name}, encoding = ${encoding})`);
+      this.#logger.debug(`SecretReader:readSecret(name = ${name}, encoding = ${encoding})`);
     }
     var filepath = `${this.#config.root}/${name}`;
     try {
@@ -60,11 +70,11 @@ class SecretReader {
       }
     } catch (err) {
       if (err.code === 'ENOENT') {
-        console.error(`File at path ${filepath} does not exist`);
+        this.#logger.error(`File at path ${filepath} does not exist`);
       } else if (err.code === 'EACCES') {
-        console.error(`File at path ${filepath} cannot be read`);
+        this.#logger.error(`File at path ${filepath} cannot be read`);
       } else {
-        console.error('An unknown error occurred while reading the secret');
+        this.#logger.error('An unknown error occurred while reading the secret');
       }
     }
     return null;

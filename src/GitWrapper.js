@@ -17,6 +17,9 @@ const { Octokit } = require('@octokit/rest');
 const { throttling } = require('@octokit/plugin-throttling');
 const { retry } = require('@octokit/plugin-retry');
 
+const { getLogger } = require('./logger.js');
+let log = getLogger('info', 'GitWrapper');
+
 const ExtendedOctokit = Octokit
   .plugin(retry)
   .plugin(throttling);
@@ -48,10 +51,21 @@ module.exports = class {
   #token;
   #dryrun;
   #verbose;
+  #logger;
+  set logger(logger) {
+    this.#logger = logger;
+    // set external as well to log info
+    log = logger;
+  }
+  get logger() {
+    return this.#logger;
+  }
+
   constructor(token, verbose = false, dryrun = false) {
     this.#token = token;
     this.#verbose = verbose;
     this.#dryrun = dryrun;
+    this.#logger = getLogger(this.#verbose ? 'debug' : 'info', 'GitWrapper');
     // instantiate octokit
     octokit = new ExtendedOctokit({
       auth: this.#token,
@@ -60,18 +74,18 @@ module.exports = class {
       },
       throttle: {
         onRateLimit: (retryAfter, options) => {
-          console.log(`Request quota exhausted for request ${options.method} ${options.url}`);
+          this.#logger.warn(`Request quota exhausted for request ${options.method} ${options.url}`);
 
           if (options.request.retryCount <= RETRY_COUNTS_DEFAULT) { // only retries once
-            console.log(`Retrying after ${retryAfter} seconds!`);
+            this.#logger.warn(`Retrying after ${retryAfter} seconds!`);
             return true;
           }
         },
         onAbuseLimit: (retryAfter, options) => {
           // does not retry, only logs a warning
-          console.log(`Abuse detected for request ${options.method} ${options.url}`);
+          this.#logger.warn(`Abuse detected for request ${options.method} ${options.url}`);
           if (options.request.retryCount <= RETRY_COUNTS_DEFAULT) { // only retries once
-            console.log(`Retrying after ${retryAfter} seconds!`);
+            this.#logger.warn(`Retrying after ${retryAfter} seconds!`);
             return true;
           }
           return false;
@@ -87,6 +101,7 @@ module.exports = class {
   // enable dry run functionality
   setVerbose(isVerbose) {
     this.#verbose = isVerbose;
+    this.#logger = getLogger(this.#verbose ? 'debug' : 'info', 'GitWrapper');
   }
 
   getCallCount() {
@@ -95,36 +110,36 @@ module.exports = class {
 
   async checkAccess() {
     if (this.#token === undefined || this.#token === '') {
-      console.log('Application was not given an access token and will not continue');
+      this.#logger.error('Application was not given an access token and will not continue');
       return;
     }
     try {
       const { headers } = await octokit.request('HEAD /');
       const scopes = headers['x-oauth-scopes'].split(', ');
       if (scopes.indexOf('admin:org') < 0) {
-        console.log('Application was not given an access token with the admin:org scope and will not continue');
+        this.#logger.error('Application was not given an access token with the admin:org scope and will not continue');
       } else {
         return true;
       }
     } catch (err) {
-      console.log('Application was not given a valid access token');
+      this.#logger.error('Application was not given a valid access token');
     }
     return false;
   }
 
   addTeam(org, teamName) {
     if (this.#verbose === true) {
-      console.log(`addTeam(org = ${org}, teamName = ${teamName})`);
+      this.#logger.debug(`addTeam(org = ${org}, teamName = ${teamName})`);
     }
     if (!org || !teamName) {
-      console.log('addTeam command requires organization and team to be set');
+      this.#logger.error('addTeam command requires organization and team to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(teamName);
     // check if the team already exists
     var cachedResult = teamCache.getKey(getTeamCacheKey(org, sanitizedTeam));
     if (cachedResult != null) {
-      console.log(`Team with name ${teamName} already exists for ${org}, skipping creation`);
+      this.#logger.verbose(`Team with name ${teamName} already exists for ${org}, skipping creation`);
       return cachedResult;
     }
 
@@ -139,11 +154,11 @@ module.exports = class {
         // cache the result for later use
         teamCache.setKey(getTeamCacheKey(org, sanitizedTeam), result.data);
 
-        console.log(`Done creating team with name: ${org}:${sanitizedTeam}`);
+        this.#logger.verbose(`Done creating team with name: ${org}:${sanitizedTeam}`);
         return result.data;
       }).catch(err => logError(err, 'team:create'));
     } else {
-      console.log(`Dry run set, not writing new team ${org}:${sanitizedTeam}`);
+      this.#logger.debug(`Dry run set, not writing new team ${org}:${sanitizedTeam}`);
     }
   }
 
@@ -154,15 +169,15 @@ module.exports = class {
    */
   async addRepoToTeam(org, teamName, repo, permissions = 'pull', overwrite = true) {
     if (this.#verbose === true) {
-      console.log(`addRepoToTeam(org = ${org}, teamName = ${teamName}, repo = ${repo}`
+      this.#logger.debug(`addRepoToTeam(org = ${org}, teamName = ${teamName}, repo = ${repo}`
         + `, permissions = ${permissions}, overwrite = ${overwrite})`);
     }
     if (!org || !teamName || !repo) {
-      console.log('addRepoToTeam command requires organization, team, and repo to be set');
+      this.#logger.warn('addRepoToTeam command requires organization, team, and repo to be set');
       return;
     }
     if (!overwrite && (await doesTeamManageRepo(org, teamName, repo))) {
-      console.log(`${org}/${repo} is already managed by ${teamName} and is set to not overwrite, returning`);
+      this.#logger.warn(`${org}/${repo} is already managed by ${teamName} and is set to not overwrite, returning`);
       return;
     }
     var sanitizedTeam = sanitizeTeamName(teamName);
@@ -183,19 +198,19 @@ module.exports = class {
         repo: repo,
         permission: permissions,
       }).then(result => {
-        console.log(`Done adding repo to team: ${repo} -> ${org}/${sanitizedTeam}`);
+        this.#logger.verbose(`Done adding repo to team: ${repo} -> ${org}/${sanitizedTeam}`);
       }).catch(err => logError(err, 'team:addOrUpdateRepo'));
     } else {
-      console.log(`Dry run set, not writing new team ${org}/${sanitizedTeam}`);
+      this.#logger.debug(`Dry run set, not writing new team ${org}/${sanitizedTeam}`);
     }
   }
 
   async removeTeam(org, teamName) {
     if (this.#verbose === true) {
-      console.log(`removeTeam(org = ${org}, teamName = ${teamName})`);
+      this.#logger.debug(`removeTeam(org = ${org}, teamName = ${teamName})`);
     }
     if (!org || !teamName) {
-      console.log('removeTeam command requires organization and teamName to be set');
+      this.#logger.warn('removeTeam command requires organization and teamName to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(teamName);
@@ -213,10 +228,10 @@ module.exports = class {
         org: org,
         team_slug: teamData.slug,
       }).then(result => {
-        console.log(`Done removing team: ${org}/${sanitizedTeam}`);
+        this.#logger.verbose(`Done removing team: ${org}/${sanitizedTeam}`);
       }).catch(err => logError(err, 'team:deleteInOrg'));
     } else {
-      console.log(`Dry run set, not removing team ${org}/${sanitizedTeam}`);
+      this.#logger.debug(`Dry run set, not removing team ${org}/${sanitizedTeam}`);
     }
   }
 
@@ -227,10 +242,10 @@ module.exports = class {
    */
   async inviteUserToTeam(org, teamName, uname) {
     if (this.#verbose === true) {
-      console.log(`inviteUserToTeam(org = ${org}, teamName = ${teamName}, uname = ${uname})`);
+      this.#logger.debug(`inviteUserToTeam(org = ${org}, teamName = ${teamName}, uname = ${uname})`);
     }
     if (!org || !teamName || !uname) {
-      console.log('inviteUserToTeam command requires organization, team, and uname to be set');
+      this.#logger.warn('inviteUserToTeam command requires organization, team, and uname to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(teamName);
@@ -249,7 +264,7 @@ module.exports = class {
     }
     for (var i = 0; i < teamMembers.length; i++) {
       if (teamMembers[i].login === uname) {
-        console.log(`User with usernmae '${uname}' is already a member of ${org}/${sanitizedTeam}`);
+        this.#logger.verbose(`User with usernmae '${uname}' is already a member of ${org}/${sanitizedTeam}`);
         return;
       }
     }
@@ -262,7 +277,7 @@ module.exports = class {
         team_slug: teamData.slug,
         username: uname,
       }).then(result => {
-        console.log(`Done inviting user to team: ${uname} -> ${org}/${sanitizedTeam}`);
+        this.#logger.verbose(`Done inviting user to team: ${uname} -> ${org}/${sanitizedTeam}`);
       }).catch(err => logError(err, 'team:addOrUpdateMembership'));
     }
   }
@@ -274,10 +289,10 @@ module.exports = class {
    */
   async removeUserFromTeam(org, teamName, uname) {
     if (this.#verbose === true) {
-      console.log(`removeUserFromTeam(org = ${org}, teamName = ${teamName}, uname = ${uname})`);
+      this.#logger.debug(`removeUserFromTeam(org = ${org}, teamName = ${teamName}, uname = ${uname})`);
     }
     if (!org || !teamName || !uname) {
-      console.log('removeUserFromTeam command requires organization, team, and uname to be set');
+      this.#logger.warn('removeUserFromTeam command requires organization, team, and uname to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(teamName);
@@ -302,7 +317,7 @@ module.exports = class {
       }
     }
     if (!isMember) {
-      console.log(`User with usernmae '${uname}' is not a member of ${org}/${teamName}, cannot remove`);
+      this.#logger.warn(`User with username '${uname}' is not a member of ${org}/${teamName}, cannot remove`);
       return;
     }
 
@@ -314,7 +329,7 @@ module.exports = class {
         team_slug: teamData.slug,
         username: uname,
       }).then(result => {
-        console.log(`Done removing user from team: ${uname} -> ${org}/${sanitizedTeam}`);
+        this.#logger.verbose(`Done removing user from team: ${uname} -> ${org}/${sanitizedTeam}`);
       }).catch(err => logError(err, 'team:removeMembership'));
     }
   }
@@ -324,10 +339,10 @@ module.exports = class {
    */
   async renameTeam(org, teamName, newName) {
     if (this.#verbose === true) {
-      console.log(`addRepo(org = ${org}, teamName = ${teamName}, newName = ${newName})`);
+      this.#logger.debug(`addRepo(org = ${org}, teamName = ${teamName}, newName = ${newName})`);
     }
     if (!org || !teamName || !newName) {
-      console.log('renameTeam command requires organization, team, and new team name to be set');
+      this.#logger.warn('renameTeam command requires organization, team, and new team name to be set');
       return;
     }
     var sanitizedTeam = sanitizeTeamName(teamName);
@@ -347,7 +362,7 @@ module.exports = class {
         team_slug: teamData.slug,
         name: sanitizedNewTeam,
       }).then(result => {
-        console.log(`Done renaming team: ${org}/${sanitizedTeam} -> ${org}/${sanitizedNewTeam}`);
+        this.#logger.verbose(`Done renaming team: ${org}/${sanitizedTeam} -> ${org}/${sanitizedNewTeam}`);
       }).catch(err => logError(err, 'team:update'));
     }
   }
@@ -357,10 +372,10 @@ module.exports = class {
    */
   addRepo(org, repo) {
     if (this.#verbose === true) {
-      console.log(`addRepo(org = ${org}, repo = ${repo})`);
+      this.#logger.debug(`addRepo(org = ${org}, repo = ${repo})`);
     }
     if (repoCache.getKey(getRepoCacheKey(org, repo)) !== null) {
-      console.log(`Repo with name ${repo} already exists for ${org}, skipping creation`);
+      this.#logger.warn(`Repo with name ${repo} already exists for ${org}, skipping creation`);
 
       return repoCache.getKey(getRepoCacheKey(org, repo));
     }
@@ -375,7 +390,7 @@ module.exports = class {
         // cache the result for later use
         repoCache.setKey(getRepoCacheKey(org, repo), result.data);
 
-        console.log(`Done creating repo for org: ${org}/${repo}`);
+        this.#logger.verbose(`Done creating repo for org: ${org}/${repo}`);
         return result.data;
       }).catch(err => logError(err, 'repos:createInOrg'));
     }
@@ -391,14 +406,14 @@ module.exports = class {
 
   async editTeam(org, team, options) {
     if (this.#verbose === true) {
-      console.log(`editTeam(org = ${org}, team = ${JSON.stringify(team)}, options = ${JSON.stringify(options)})`);
+      this.#logger.debug(`editTeam(org = ${org}, team = ${JSON.stringify(team)}, options = ${JSON.stringify(options)})`);
     }
-    console.log(`Updating team ${team} settings: ${JSON.stringify(options)}`);
+    this.#logger.verbose(`Updating team ${team} settings: ${JSON.stringify(options)}`);
     // call the API to get additional information about the team
     var teamData = await getTeam(org, sanitizeTeamName(team));
     // check if data was returned
     if (teamData == null) {
-      console.log(`Could not find team with name ${team} to update`);
+      this.#logger.warn(`Could not find team with name ${team} to update`);
       return;
     }
     // allow for other options being set
@@ -421,15 +436,15 @@ module.exports = class {
    */
   async prefetchTeams(org) {
     if (this.#verbose === true) {
-      console.log(`prefetchTeams(org = ${org})`);
+      this.#logger.debug(`prefetchTeams(org = ${org})`);
     }
     if (prefetch['teams'][org] === true) {
       if (this.#verbose === true) {
-        console.log(`Org '${org}' teams have been fetched previously, returning`);
+        this.#logger.debug(`Org '${org}' teams have been fetched previously, returning`);
       }
       return;
     }
-    console.log(`Starting prefetch for teams in org=${org}`);
+    this.#logger.info(`Starting prefetch for teams in org=${org}`);
 
     var options = octokit.teams.list.endpoint.merge({
       org: org,
@@ -438,7 +453,7 @@ module.exports = class {
       .then(result => result)
       .catch(err => logError(err, 'team:list'));
     if (data === undefined) {
-      console.log(`An error occured while prefetching teams for org '${org}', returning`);
+      this.#logger.error(`An error occured while prefetching teams for org '${org}', returning`);
       return;
     }
 
@@ -453,7 +468,7 @@ module.exports = class {
 
     // set the prefetch flag for org to true
     prefetch['teams'][org] = true;
-    console.log(`Finished prefetch for org=${org}, got ${count} teams`);
+    this.#logger.verbose(`Finished prefetch for org=${org}, got ${count} teams`);
   }
 
   /**
@@ -462,15 +477,15 @@ module.exports = class {
    */
   async prefetchRepos(org) {
     if (this.#verbose === true) {
-      console.log(`prefetchRepos(org = ${org})`);
+      this.#logger.debug(`prefetchRepos(org = ${org})`);
     }
     if (prefetch['repos'][org] === true) {
       if (this.#verbose === true) {
-        console.log(`Org '${org}' repos have been fetched previously, returning`);
+        this.#logger.debug(`Org '${org}' repos have been fetched previously, returning`);
       }
       return;
     }
-    console.log(`Starting prefetch for repos in org=${org}`);
+    this.#logger.verbose(`Starting prefetch for repos in org=${org}`);
     var options = octokit.repos.listForOrg.endpoint.merge({
       org: org,
     });
@@ -478,7 +493,7 @@ module.exports = class {
       .then(result => result)
       .catch(err => logError(err, 'team:listMembers'));
     if (data === undefined) {
-      console.log(`An error occured while prefetching repos for org '${org}', returning`);
+      this.#logger.error(`An error occured while prefetching repos for org '${org}', returning`);
       return;
     }
     var count = 0;
@@ -492,7 +507,7 @@ module.exports = class {
 
     // set the prefetch flag for org to true
     prefetch['repos'][org] = true;
-    console.log(`Finished prefetch for org=${org}, got ${count} repos`);
+    this.#logger.verbose(`Finished prefetch for org=${org}, got ${count} repos`);
   }
 
   /**
@@ -500,7 +515,7 @@ module.exports = class {
    */
   async getTeamsForOrg(org) {
     if (this.#verbose === true) {
-      console.log(`getTeamsForOrg(org = ${org})`);
+      this.#logger.debug(`getTeamsForOrg(org = ${org})`);
     }
     await this.prefetchTeams(org);
     var out = [];
@@ -516,9 +531,9 @@ module.exports = class {
    */
   async getReposForTeam(org, team) {
     if (this.#verbose === true) {
-      console.log(`getReposForTeam(org = ${org}, team = ${JSON.stringify(team)})`);
+      this.#logger.debug(`getReposForTeam(org = ${org}, team = ${JSON.stringify(team)})`);
     }
-    console.log(`Getting repos associated with team: ${team.name}`);
+    this.#logger.verbose(`Getting repos associated with team: ${team.name}`);
     var options = octokit.teams.listReposInOrg.endpoint.merge({
       team_slug: team.slug,
       org: org,
@@ -530,13 +545,13 @@ module.exports = class {
 
   async getInvitedMembers(org, team) {
     if (this.#verbose === true) {
-      console.log(`getInvitedMembers(org = ${org}, team = ${JSON.stringify(team)})`);
+      this.#logger.debug(`getInvitedMembers(org = ${org}, team = ${JSON.stringify(team)})`);
     }
     // generate a cache key and check if we have a valid cache result.
     var cacheKey = getInvitedMembersCacheKey(org, team.slug);
     var cachedResult = teamCache.getKey(cacheKey);
 
-    console.log(`Getting invited members for key: ${cacheKey}`);
+    this.#logger.verbose(`Getting invited members for key: ${cacheKey}`);
     // fetch if we don't have a cached result
     if (cachedResult === undefined) {
       // loop through all available users, and add them to a list to be
@@ -558,7 +573,7 @@ module.exports = class {
       // return the data for usage
       return Array.from(data);
     } else {
-      console.log(`Found cached result for key ${cacheKey}`);
+      this.#logger.verbose(`Found cached result for key ${cacheKey}`);
 
       // return result to be immediately used
       return Array.from(cachedResult);
@@ -567,12 +582,12 @@ module.exports = class {
 
   async getOrgCollaborators(org) {
     if (this.#verbose === true) {
-      console.log(`getOrgCollaborators(org = ${org})`);
+      this.#logger.debug(`getOrgCollaborators(org = ${org})`);
     }
     var cacheKey = getOrgCollabCacheKey(org);
     var cachedResult = orgCache.getKey(cacheKey);
 
-    console.log(`Getting invited members for key: ${cacheKey}`);
+    this.#logger.verbose(`Getting invited members for key: ${cacheKey}`);
     // fetch if we don't have a cached result
     if (cachedResult === undefined) {
       // loop through all available users, and add them to a list to be
@@ -593,7 +608,7 @@ module.exports = class {
       // return the data for usage
       return Array.from(data);
     } else {
-      console.log(`Found cached result for key ${cacheKey}`);
+      this.#logger.debug(`Found cached result for key ${cacheKey}`);
 
       // return result to be immediately used
       return Array.from(cachedResult | {});
@@ -602,13 +617,13 @@ module.exports = class {
 
   async getRepoCollaborators(org, repo, affiliation = 'direct') {
     if (this.#verbose === true) {
-      console.log(`getRepoCollaborators(org = ${org}, repo = ${repo}, affiliation = ${affiliation})`);
+      this.#logger.debug(`getRepoCollaborators(org = ${org}, repo = ${repo}, affiliation = ${affiliation})`);
     }
     // generate a cache key and check if we have a valid cache result.
     var cacheKey = getRepoCollaboratorCacheKey(org, repo);
     var cachedResult = repoCache.getKey(cacheKey);
 
-    console.log(`Getting collaborators for key: ${cacheKey}`);
+    this.#logger.verbose(`Getting collaborators for key: ${cacheKey}`);
     // fetch if we don't have a cached result
     if (cachedResult === undefined) {
       // loop through all available users, and add them to a list to be
@@ -631,7 +646,7 @@ module.exports = class {
       // return the data for usage
       return Array.from(data);
     } else {
-      console.log(`Found cached result for key ${cacheKey}`);
+      this.#logger.debug(`Found cached result for key ${cacheKey}`);
 
       // return result to be immediately used
       return Array.from(cachedResult);
@@ -641,16 +656,16 @@ module.exports = class {
 
   async removeUserAsCollaborator(org, repo, uname) {
     if (this.#verbose === true) {
-      console.log(`removeUserAsCollaborator(org = ${org}, repo = ${repo}, uname = ${uname})`);
+      this.#logger.debug(`removeUserAsCollaborator(org = ${org}, repo = ${repo}, uname = ${uname})`);
     }
     if (!org || !repo || !uname) {
-      console.log('removeUserAsCollaborator command requires organization, repo, and uname to be set');
+      this.#logger.error('removeUserAsCollaborator command requires organization, repo, and uname to be set');
       return;
     }
 
     var collabs = await this.getRepoCollaborators(org, repo);
     if (collabs === null) {
-      console.log(`Could not find collaborators for team ${org}/${repo}`);
+      this.#logger.warn(`Could not find collaborators for team ${org}/${repo}`);
       return;
     }
     var isCollaborator = false;
@@ -661,7 +676,7 @@ module.exports = class {
       }
     }
     if (!isCollaborator) {
-      console.log(`User with usernmae '${uname}' is not a collaborator on ${org}/${repo}, cannot remove`);
+      this.#logger.warn(`User with usernmae '${uname}' is not a collaborator on ${org}/${repo}, cannot remove`);
       return;
     }
 
@@ -673,23 +688,23 @@ module.exports = class {
         repo: repo,
         username: uname,
       }).then(result => {
-        console.log(`Done removing user from team: ${uname} -> ${org}/${repo}`);
+        this.#logger.verbose(`Done removing user from team: ${uname} -> ${org}/${repo}`);
       }).catch(err => logError(err, 'repo:removeCollaborator'));
     }
   }
 
   async removeUserAsOutsideCollaborator(org, uname) {
     if (this.#verbose === true) {
-      console.log(`removeUserAsOutsideCollaborator(org = ${org}, uname = ${uname})`);
+      this.#logger.debug(`removeUserAsOutsideCollaborator(org = ${org}, uname = ${uname})`);
     }
     if (!org || !uname) {
-      console.log('removeUserAsOutsideCollaborator command requires organization and uname to be set');
+      this.#logger.warn('removeUserAsOutsideCollaborator command requires organization and uname to be set');
       return;
     }
 
     var collabs = await this.getOrgCollaborators(org);
     if (collabs === null) {
-      console.log(`Could not find outside collaborators for team ${org}`);
+      this.#logger.warn(`Could not find outside collaborators for team ${org}`);
       return;
     }
     var isCollaborator = false;
@@ -700,7 +715,7 @@ module.exports = class {
       }
     }
     if (!isCollaborator) {
-      console.log(`User with usernmae '${uname}' is not an outside collaborator on ${org}, cannot remove`);
+      this.#logger.warn(`User with username '${uname}' is not an outside collaborator on ${org}, cannot remove`);
       return;
     }
 
@@ -711,7 +726,7 @@ module.exports = class {
         org: org,
         username: uname,
       }).then(result => {
-        console.log(`Done removing outside collaborator from org: ${uname} -> ${org}`);
+        this.#logger.verbose(`Done removing outside collaborator from org: ${uname} -> ${org}`);
       }).catch(err => logError(err, 'orgs:removeOutsideCollaborator'));
     }
   }
@@ -722,14 +737,14 @@ module.exports = class {
    */
   updateOrgPermissions(org, permissions) {
     if (this.#verbose === true) {
-      console.log(`updateOrgPermissions(org = ${org}, permissions = ${JSON.stringify(permissions)})`);
+      this.#logger.debug(`updateOrgPermissions(org = ${org}, permissions = ${JSON.stringify(permissions)})`);
     }
     if (org === undefined || org === '') {
-      console.log('Cannot update permissions for empty org name');
+      this.#logger.warn('Cannot update permissions for empty org name');
       return;
     }
     if (permissions === undefined || !(permissions instanceof Object)) {
-      console.log('Cannot update organization with empty permissions');
+      this.#logger.warn('Cannot update organization with empty permissions');
       return;
     }
     // copy the permissions, and set the org into the new params object
@@ -743,27 +758,27 @@ module.exports = class {
       // increment the call count  and update the permissions for the organization
       callCount++;
       return octokit.orgs.update(params).then(result => {
-        // if verbose is set, print the parameters to console
+        // if verbose is set, print the parameters to this.#logger
         if (this.#verbose) {
-          console.log(`Done updating org (${org}) to set parameters: ${JSON.stringify(params)}`);
+          this.#logger.debug(`Done updating org (${org}) to set parameters: ${JSON.stringify(params)}`);
         } else {
-          console.log(`Done updating org (${org}) to set parameters.`);
+          this.#logger.verbose(`Done updating org (${org}) to set parameters.`);
         }
       }).catch(err => logError(err, 'orgs:update'));
     } else {
-      console.log(`Dry run enabled, would have updated org (${org}) to set parameters: ${JSON.stringify(params)}`);
+      this.#logger.debug(`Dry run enabled, would have updated org (${org}) to set parameters: ${JSON.stringify(params)}`);
     }
   }
 
   getOrganization(org) {
     if (this.#verbose === true) {
-      console.log(`getOrganization(org = ${org})`);
+      this.#logger.debug(`getOrganization(org = ${org})`);
     }
     // generate a cache key and check if we have a valid cache result.
     var cacheKey = getOrgCacheKey(org);
     var cachedResult = orgCache.getKey(cacheKey);
 
-    console.log(`Getting org for key: ${cacheKey}`);
+    this.#logger.verbose(`Getting org for key: ${cacheKey}`);
     // fetch if we don't have a cached result
     if (cachedResult === undefined) {
       callCount++;
@@ -779,7 +794,7 @@ module.exports = class {
         return JSON.parse(JSON.stringify(result.data));
       }).catch(err => logError(err, 'orgs:get'));
     } else {
-      console.log(`Found cached result for key ${cacheKey}`);
+      this.#logger.debug(`Found cached result for key ${cacheKey}`);
 
       // return result to be immediately used
       return JSON.parse(JSON.stringify(cachedResult));
@@ -791,7 +806,7 @@ module.exports = class {
    */
   getDiscoveredRepos(org) {
     if (this.#verbose === true) {
-      console.log(`getDiscoveredRepos(org = ${org})`);
+      this.#logger.debug(`getDiscoveredRepos(org = ${org})`);
     }
     var out = [];
     var keys = repoCache.keys();
@@ -810,10 +825,10 @@ module.exports = class {
    */
   async getTeamsForRepo(org, repo) {
     if (this.#verbose === true) {
-      console.log(`getTeamsForRepo(org = ${org}, repo = ${repo})`);
+      this.#logger.debug(`getTeamsForRepo(org = ${org}, repo = ${repo})`);
     }
     if (!org || !repo) {
-      console.log('getTeamsForRepo command requires organization and repo to be set');
+      this.#logger.warn('getTeamsForRepo command requires organization and repo to be set');
       return;
     }
     // if not set to dryrun, remove outside collaborator from org
@@ -843,7 +858,7 @@ function getTeam(org, team) {
   var cacheKey = getTeamCacheKey(org, sanitizeTeamName(team));
   var cachedResult = teamCache.getKey(cacheKey);
 
-  console.log(`Getting team for key: ${cacheKey}`);
+  log.verbose(`Getting team for key: ${cacheKey}`);
   // fetch if we don't have a cached result
   if (cachedResult === undefined) {
     callCount++;
@@ -858,7 +873,7 @@ function getTeam(org, team) {
       return JSON.parse(JSON.stringify(result.data));
     }).catch(err => logError(err, 'team:getByName'));
   } else {
-    console.log(`Found cached result for key ${cacheKey}`);
+    log.verbose(`Found cached result for key ${cacheKey}`);
 
     // return result to be immediately used
     return JSON.parse(JSON.stringify(cachedResult));
@@ -874,7 +889,7 @@ async function getTeamMembers(org, team) {
   var cacheKey = getTeamMembersCacheKey(org, team.name);
   var cachedResult = teamCache.getKey(cacheKey);
 
-  console.log(`Getting team members for key: ${cacheKey}`);
+  log.verbose(`Getting team members for key: ${cacheKey}`);
   // fetch if we don't have a cached result
   if (cachedResult === undefined) {
     // loop through all available users, and add them to a list to be returned
@@ -895,7 +910,7 @@ async function getTeamMembers(org, team) {
     // return the data for usage
     return Array.from(data);
   } else {
-    console.log(`Found cached result for key ${cacheKey}`);
+    log.verbose(`Found cached result for key ${cacheKey}`);
 
     // return result to be immediately used
     return Array.from(cachedResult);
@@ -904,14 +919,14 @@ async function getTeamMembers(org, team) {
 
 async function doesTeamManageRepo(org, teamName, repo) {
   if (!org || !teamName || !repo) {
-    console.log('checkManagesRepoInOrg command requires organization, team, and repo to be set');
+    log.debug('checkManagesRepoInOrg command requires organization, team, and repo to be set');
     return;
   }
   var sanitizedTeamName = sanitizeTeamName(teamName);
   // get the team for its ID
   var team = getTeam(org, sanitizedTeamName);
   if (team === null) {
-    console.log(`Could not find team for ${org}/${sanitizedTeamName}, returning false for team management`);
+    log.warn(`Could not find team for ${org}/${sanitizedTeamName}, returning false for team management`);
     return false;
   }
   // check if we already know about this teams management of repo
@@ -930,7 +945,7 @@ async function doesTeamManageRepo(org, teamName, repo) {
     teamCache.setKey(getTeamManagementCacheKey(org, team.id, repo), result.status === ACCEPTED_HTTP_STATUS);
     return result.status === ACCEPTED_HTTP_STATUS;
   } catch (e) {
-    console.log('Retrieved an error, assuming team does not manage repo');
+    log.warn('Retrieved an error, assuming team does not manage repo');
     return false;
   }
 }
@@ -972,11 +987,11 @@ function getOrgCacheKey(org) {
  * additional contextual information.
  */
 function logError(err, root) {
-  console.log(`API encountered errors processing current request (${root}). More information is available in log file`);
+  log.error(`API encountered errors processing current request (${root}). More information is available in log file`);
   if (err.errors) {
     for (var i = 0; i < err.errors.length; i++) {
-      console.log(`${err.errors[i].message}`);
+      log.error(`${err.errors[i].message}`);
     }
   }
-  console.log(err);
+  log.error(err);
 }

@@ -17,6 +17,7 @@
    by the script.
 */
 const teamData = require('./static.json');
+const { getLogger } = require('../logger.js');
 
 const ServiceTypes = {
   GITHUB: 'GITHUB',
@@ -69,10 +70,18 @@ class StaticTeamManager {
   set verbose(val) {
     if (typeof val === 'boolean') {
       this.#verbose = val;
+      this.#logger = getLogger(this.#verbose ? 'debug' : 'info', 'StaticTeamManager');
     }
   }
   get verbose() {
     return this.#verbose;
+  }
+  #logger;
+  set logger(logger) {
+    this.#logger = logger;
+  }
+  get logger() {
+    return this.#logger;
   }
 
   /**
@@ -102,7 +111,7 @@ class StaticTeamManager {
       this.extendedTeamData.push(...additionalTeamData);
     }
     this.extendedTeamData.push(...teamData);
-
+    this.#logger = getLogger('info', 'StaticTeamManager');
   }
 
   processTeams(serviceType) {
@@ -110,14 +119,14 @@ class StaticTeamManager {
     for (let key in this.extendedTeamData) {
       let team = this.extendedTeamData[key];
       if (this.#verbose) {
-        console.log(`Processing team ${team.teamName} for service type '${serviceType}'`);
+        this.#logger.info(`Processing team ${team.teamName} for service type '${serviceType}'`);
       }
       let perms = this.getPermissionsForTeam(team, serviceType);
       if (perms === null) {
-        console.log(`Could not get permissions for team, ending processing of this team: ${JSON.stringify(team)}`);
+        this.#logger.warn(`Could not get permissions for team, ending processing of this team: ${JSON.stringify(team)}`);
         continue;
       } else if (this.#verbose) {
-        console.log(`Detected permissions value of '${perms}' for current team.`);
+        this.#logger.verbose(`Detected permissions value of '${perms}' for current team.`);
       }
 
       let repos = [];
@@ -126,11 +135,11 @@ class StaticTeamManager {
         // if the repo is applicable to current service, then track it
         if (this.checkRepoForServiceType(repo, serviceType)) {
           if (this.#verbose) {
-            console.log(`Repo '${repo}' in team ${team.teamName} is compatible with current service type, tracking`);
+            this.#logger.debug(`Repo '${repo}' in team ${team.teamName} is compatible with current service type, tracking`);
           }
           repos.push(repo);
         } else if (this.#verbose) {
-          console.log(`Repo '${repo}' in team ${team.teamName} not compatible with current service type ${serviceType}, skipping`);
+          this.#logger.debug(`Repo '${repo}' in team ${team.teamName} not compatible with current service type ${serviceType}, skipping`);
         }
       }
       // only add if there are repos to handle
@@ -158,15 +167,20 @@ class StaticTeamManager {
 
   getPermissionsForTeam(team, serviceType) {
     if (team === null || serviceType === null) {
+      this.#logger.warn(`Cannot get permissions for team ${team.teamName} with no service type`);
       return null;
     }
     // iterate over the enum keys to check if
     for (let idx in enumKeys) {
       let key = enumKeys[idx];
       if (team.permission === key) {
+        if (this.#verbose) {
+          this.#logger.verbose(`Found permissions ${PermissionsEnum[key](serviceType)} for team ${team.teamName}`);
+        }
         return PermissionsEnum[key](serviceType);
       }
     }
+    this.#logger.warn(`No valid permissions found for team ${team.teamName}`);
     return null;
   }
 }

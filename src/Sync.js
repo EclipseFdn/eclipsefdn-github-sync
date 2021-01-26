@@ -66,6 +66,8 @@ const API_OK_STATUS = 200;
 const API_MISSING_STATUS = 404;
 const EXIT_ERROR_STATE = 1;
 
+const { getLogger } = require('./logger.js');
+const logger = getLogger(argv.V ? 'debug' : 'info');
 const axios = require('axios');
 const { SecretReader, getBaseConfig } = require('./SecretReader.js');
 const { StaticTeamManager, ServiceTypes } = require('./teams/StaticTeamManager.js');
@@ -104,7 +106,7 @@ function _prepareSecret() {
  */
 async function _init(secret) {
   if (secret === undefined || secret === '') {
-    console.log('Could not fetch API secret, exiting');
+    logger.error('Could not fetch API secret, exiting');
     return;
   }
   wrap = new Wrapper(secret);
@@ -113,23 +115,24 @@ async function _init(secret) {
   }
   wrap.setDryRun(argv.d);
   wrap.setVerbose(argv.V);
-  console.log(`Running in dryrun? ${argv.d}`);
+  logger.info(`Running in dryrun? ${argv.d}`);
 
   cHttp = new HttpWrapper();
   stm = new StaticTeamManager();
   stm.verbose = argv.V;
 
   eclipseApi = new EclipseAPI();
+  eclipseApi.verbose = argv.V;
   eclipseApi.testMode = argv.t;
   // get raw project data and post process to add additional context
   var data = await eclipseApi.eclipseAPI('?github_only=1');
   data = eclipseApi.postprocessEclipseData(data, 'github_repos');
 
-  console.log(`Finished preloading ${data.length} projects`);
+  logger.info(`Finished preloading ${data.length} projects`);
   // get bots for raw project processing
   var rawBots = await eclipseApi.eclipseBots();
   bots = eclipseApi.processBots(rawBots);
-  console.log(`Found ${Object.keys(bots).length} registered bots`);
+  logger.info(`Found ${Object.keys(bots).length} registered bots`);
 
   // start the sync operation.
   await runSync(data);
@@ -150,7 +153,7 @@ async function runSync(data) {
       console.log(`Project target set ('${argv.p}'). Skipping non-matching project ${projectID}`);
       continue;
     }
-    console.log(`Project ID: ${projectID}`);
+    logger.info(`Project ID: ${projectID}`);
 
     // maintain orgs used by this project
     var orgs = await processRepositories(repos, project);
@@ -158,17 +161,17 @@ async function runSync(data) {
     for (var orgIdx in orgs) {
       var org = orgs[orgIdx];
       if (!uniqueOrgs.includes(org)) {
-        console.log(`Removing outside collaborators for ${org}`);
+        logger.info(`Removing outside collaborators for ${org}`);
         await removeOrgExternalContributors(data, org);
         uniqueOrgs.push(org);
       }
     }
   }
-  console.log('\nBeginning processing of static teams');
+  logger.info('Beginning processing of static teams');
   // retrieve the static teams for GitHub
   var teams = stm.processTeams(ServiceTypes.GITHUB);
   if (argv.V) {
-    console.log(`Number of custom teams discovered: ${teams.length}`);
+    logger.info(`Number of custom teams discovered: ${teams.length}`);
   }
   for (var tIdx in teams) {
     var team = teams[tIdx];
@@ -178,24 +181,24 @@ async function runSync(data) {
 
   // log how long it took to do this stuff
   var end = new Date();
-  console.log(`Start: ${start}, end: ${end}, calls: ${wrap.getCallCount()}`);
+  logger.info(`Start: ${start}, end: ${end}, calls: ${wrap.getCallCount()}`);
 }
 
 async function processRepositories(repos, project) {
   if (argv.V === true) {
-    console.log(`Sync:processRepositories(repos = ${JSON.stringify(repos)}, project = ${JSON.stringify(project)})`);
+    logger.debug(`Sync:processRepositories(repos = ${JSON.stringify(repos)}, project = ${JSON.stringify(project)})`);
   }
   var orgs = [];
   for (var idx in repos) {
     var repo = repos[idx];
     var org = repo.org;
     var repoName = repo.repo;
-    console.log(`Starting sync for org=${org};repo=${repoName}`);
+    logger.info(`Starting sync for org=${org};repo=${repoName}`);
 
     // check if we've processed this org yet, if not, then create teams and
     // add users
     if (!orgs.includes(org)) {
-      console.log(`Generating teams for ${org}/${repoName}`);
+      logger.info(`Generating teams for ${org}/${repoName}`);
       await processProjectsOrg(org, project);
       orgs.push(org);
     }
@@ -203,7 +206,7 @@ async function processRepositories(repos, project) {
     // process contributors for the team
     var successfullyUpdatedExt = await removeRepoExternalContributors(project, org, repoName);
     if (argv.V === true) {
-      console.log(`Updated external contributors: ${successfullyUpdatedExt}`);
+      logger.verbose(`Updated external contributors: ${successfullyUpdatedExt}`);
     }
     if (!argv.d) {
       try {
@@ -212,15 +215,15 @@ async function processRepositories(repos, project) {
         var updatedContrib = await wrap.addRepoToTeam(org, `${project.project_id}-contributors`, repoName, 'triage');
         var updatedPL = await wrap.addRepoToTeam(org, `${project.project_id}-project-leads`, repoName, 'maintain', false);
         if (argv.V === true) {
-          console.log(`Attempted update commit team: ${updatedCommit === undefined}`);
-          console.log(`Attempted update contrib team: ${updatedContrib === undefined}`);
-          console.log(`Attempted update pl team: ${updatedPL === undefined}`);
+          logger.verbose(`Attempted update commit team: ${updatedCommit === undefined}`);
+          logger.verbose(`Attempted update contrib team: ${updatedContrib === undefined}`);
+          logger.verbose(`Attempted update pl team: ${updatedPL === undefined}`);
         }
       } catch (e) {
-        console.log(`Error while updating ${project.project_id}. \n${e}`);
+        logger.error(`Error while updating ${project.project_id}. \n${e}`);
       }
     } else {
-      console.log(`Dry run set, not adding repo '${repoName}' for org: ${org}`);
+      logger.debug(`Dry run set, not adding repo '${repoName}' for org: ${org}`);
     }
   }
   return orgs;
@@ -228,13 +231,13 @@ async function processRepositories(repos, project) {
 
 async function processStaticTeam(team) {
   var orgs = [];
-  console.log(`Processing static team ${team.name}`);
+  logger.info(`Processing static team ${team.name}`);
   for (var rIdx in team.repos) {
     var repoURL = team.repos[rIdx];
     var match = /\/([^/]+)\/([^/]+)\/?$/.exec(repoURL);
     // check to make sure we got a match
     if (match == null) {
-      console.log(`Cannot match repo and org from repo URL ${repoURL}, skipping`);
+      logger.warn(`Cannot match repo and org from repo URL ${repoURL}, skipping`);
       continue;
     }
 
@@ -242,20 +245,20 @@ async function processStaticTeam(team) {
     var org = match[1];
     var repoName = match[2];
     if (argv.V) {
-      console.log(`Processing static team ${team.name} for repo ${repoName} in org ${org}`);
+      logger.info(`Processing static team ${team.name} for repo ${repoName} in org ${org}`);
     }
     // check if team is expired and should be deleted/skipped
     if (team.expiration !== undefined) {
       var expirationDate = new Date(team.expiration);
       // check if the expiration value is valid and after now
       if (expirationDate.getTime() < Date.now()) {
-        console.log(`Team with name ${team.name} is expired, it will be removed if present`);
+        logger.info(`Team with name ${team.name} is expired, it will be removed if present`);
         await wrap.removeTeam(org, wrap.sanitizeTeamName(team.name));
         continue;
       }
     }
     if (!orgs.includes(org)) {
-      console.log(`Generating teams for ${org}/${repoName}`);
+      logger.info(`Generating teams for ${org}/${repoName}`);
       await processOrg(org, team);
       orgs.push(org);
     }
@@ -264,10 +267,10 @@ async function processStaticTeam(team) {
         // update the team to have access to the repository
         await wrap.addRepoToTeam(org, wrap.sanitizeTeamName(team.name), repoName, team.permission);
       } catch (e) {
-        console.log(`Error while updating ${wrap.sanitizeTeamName(team.name)}. \n${e}`);
+        logger.warn(`Error while updating ${wrap.sanitizeTeamName(team.name)}. \n${e}`);
       }
     } else {
-      console.log(`Dry run set, not adding repo '${repoName}' to team '${wrap.sanitizeTeamName(team.name)}' for org: ${org}`);
+      logger.debug(`Dry run set, not adding repo '${repoName}' to team '${wrap.sanitizeTeamName(team.name)}' for org: ${org}`);
     }
   }
 
@@ -275,7 +278,7 @@ async function processStaticTeam(team) {
 
 async function processProjectsOrg(org, project) {
   if (argv.V === true) {
-    console.log(`Sync:processProjectsOrg(org = ${org}, project = ${JSON.stringify(project)})`);
+    logger.debug(`Sync:processProjectsOrg(org = ${org}, project = ${JSON.stringify(project)})`);
   }
   // prefetch teams to reduce redundant calls
   await wrap.prefetchTeams(org);
@@ -288,12 +291,12 @@ async function processProjectsOrg(org, project) {
     await updateProjectTeam(org, project, 'committers');
     await updateProjectTeam(org, project, 'project_leads');
   } else {
-    console.log('Dry run set, not adding teams for org: ' + org);
+    logger.debug('Dry run set, not adding teams for org: ' + org);
   }
 }
 async function processOrg(org, team) {
   if (argv.V === true) {
-    console.log(`Sync:processOrg(org = ${org}, team = ${team})`);
+    logger.debug(`Sync:processOrg(org = ${org}, team = ${team})`);
   }
   // prefetch teams to reduce redundant calls
   await wrap.prefetchTeams(org);
@@ -303,16 +306,16 @@ async function processOrg(org, team) {
   if (!argv.d) {
     await updateTeam(org, teamName, team.members, undefined);
   } else {
-    console.log(`Dry run set, not adding team '${teamName}' for org: ${org}`);
+    logger.debug(`Dry run set, not adding team '${teamName}' for org: ${org}`);
     if (argv.V) {
-      console.log(`Would have added the following users to team '${teamName}': \n${JSON.stringify(team.members)}`);
+      logger.silly(`Would have added the following users to team '${teamName}': \n${JSON.stringify(team.members)}`);
     }
   }
 }
 
 async function updateProjectTeam(org, project, grouping) {
   if (argv.V === true) {
-    console.log(`Sync:updateProjectTeam(org = ${org}, project = ${JSON.stringify(project)}, grouping = ${grouping})`);
+    logger.debug(`Sync:updateProjectTeam(org = ${org}, project = ${JSON.stringify(project)}, grouping = ${grouping})`);
   }
   var projectID = project.project_id;
   var teamName = wrap.sanitizeTeamName(`${projectID}-${grouping}`);
@@ -321,15 +324,15 @@ async function updateProjectTeam(org, project, grouping) {
 
 async function updateTeam(org, teamName, designatedMembers, project) {
   if (argv.V === true) {
-    console.log(`Sync:updateTeam(org = ${org}, teamName = ${teamName}, designatedMembers = ${JSON.stringify(designatedMembers)})`);
+    logger.debug(`Sync:updateTeam(org = ${org}, teamName = ${teamName}, designatedMembers = ${JSON.stringify(designatedMembers)})`);
   }
-  console.log(`Syncing team '${teamName}' for organization ${org}`);
+  logger.info(`Syncing team '${teamName}' for organization ${org}`);
   var team = await wrap.addTeam(org, teamName);
   // set team to private
   await wrap.editTeam(org, teamName, { privacy: 'secret' });
   var members = await wrap.getTeamMembers(org, team);
 
-  console.log(`${teamName} members: ${JSON.stringify(designatedMembers)}`);
+  logger.silly(`${teamName} members: ${JSON.stringify(designatedMembers)}`);
   for (var idx in designatedMembers) {
     // check if member has an expiration value set
     if (designatedMembers[idx].expiration !== undefined) {
@@ -342,19 +345,19 @@ async function updateTeam(org, teamName, designatedMembers, project) {
     // get the user via cached HTTP
     var userRequest = await cHttp.getRaw(designatedMembers[idx].url);
     if (userRequest.response !== undefined && userRequest.response.data === 'User not found.') {
-      console.log(`User '${designatedMembers[idx].name}' had no associated data on Eclipse API`);
+      logger.error(`User '${designatedMembers[idx].name}' had no associated data on Eclipse API`);
       continue;
     } else if (userRequest.status === API_MISSING_STATUS) {
-      console.log(`No user data could be retrieved for ${designatedMembers[idx].url}`);
+      logger.error(`No user data could be retrieved for ${designatedMembers[idx].url}`);
       continue;
     } else if (userRequest.status !== API_OK_STATUS) {
-      console.log(`Error while fetching data for ${designatedMembers[idx].url}, ending all processing`);
+      logger.error(`Error while fetching data for ${designatedMembers[idx].url}, ending all processing`);
       process.exit(EXIT_ERROR_STATE);
     }
     var user = userRequest.data;
     // check if github handle is null or empty
     if (!user.github_handle || user.github_handle.trim() === '') {
-      console.log(`User '${designatedMembers[idx].name}' has no associated GitHub username, skipping`);
+      logger.verbose(`User '${designatedMembers[idx].name}' has no associated GitHub username, skipping`);
       continue;
     }
 
@@ -366,7 +369,9 @@ async function updateTeam(org, teamName, designatedMembers, project) {
     }
   }
 
-  console.log(`Leftover members: ${JSON.stringify(members)}`);
+  logger.silly(`Leftover members: ${JSON.stringify(members)}`);
+  // Commented out until Eclipse API endpoint exists to get user for github
+  // handle
   if (members !== undefined) {
     // for each left over member, check if its a bot
     for (var i = 0; i < members.length; i++) {
@@ -374,13 +379,13 @@ async function updateTeam(org, teamName, designatedMembers, project) {
       var isBot = isUserBot(members[i].login, project);
       if (!isBot) {
         if (argv.D !== true) {
-          console.log(`Removing '${members[i].login}' from team '${teamName}'`);
+          logger.info(`Removing '${members[i].login}' from team '${teamName}'`);
           await wrap.removeUserFromTeam(org, teamName, members[i].login);
         } else {
-          console.log(`Would have deleted '${members[i].login}', but in semi-dry run mode`);
+          logger.debug(`Would have deleted '${members[i].login}', but in semi-dry run mode`);
         }
       } else {
-        console.log(`User ${members[i].login} is a bot, skipping`);
+        logger.verbose(`Could not identify '${members[i].login}' from team '${teamName}', skipping`);
       }
     }
   }
@@ -388,12 +393,12 @@ async function updateTeam(org, teamName, designatedMembers, project) {
 
 async function removeRepoExternalContributors(project, org, repo) {
   if (argv.V === true) {
-    console.log(`Sync:removeRepoExternalContributors(project = ${JSON.stringify(project)}, org = ${org}, repo = ${repo})`);
+    logger.debug(`Sync:removeRepoExternalContributors(project = ${JSON.stringify(project)}, org = ${org}, repo = ${repo})`);
   }
   // get the collaborators
   var collaborators = await wrap.getRepoCollaborators(org, repo);
   if (collaborators === undefined) {
-    console.log(`Error while fetching collaborators for ${org}/${repo}`);
+    logger.error(`Error while fetching collaborators for ${org}/${repo}`);
     return false;
   }
   // check if we have collaborators to process
@@ -411,7 +416,7 @@ async function removeRepoExternalContributors(project, org, repo) {
 
     // get the bots for the current project
     if (projBots !== undefined && projBots.indexOf(uname) !== -1) {
-      console.log(`Keeping ${uname} as it was detected to be a bot for ${org}/${repo}`);
+      logger.verbose(`Keeping ${uname} as it was detected to be a bot for ${org}/${repo}`);
       continue;
     }
 
@@ -419,7 +424,7 @@ async function removeRepoExternalContributors(project, org, repo) {
     var url = `https://api.eclipse.org/github/profile/${uname}`;
     var r = await axios.get(url).then(result => {
       return result.data;
-    }).catch(err => console.log(`Received error from Eclipse API querying for '${url}': ${err}`));
+    }).catch(err => logger.error(`Received error from Eclipse API querying for '${url}': ${err}`));
     // check user against list of project leads
     if (r != null) {
       var eclipseUserName = r.name;
@@ -432,16 +437,16 @@ async function removeRepoExternalContributors(project, org, repo) {
         }
       }
       if (isProjectLead) {
-        console.log(`User '${eclipseUserName}' is a project lead for the current repository, not removing`);
+        logger.verbose(`User '${eclipseUserName}' is a project lead for the current repository, not removing`);
         continue;
       }
     }
     // remove collaborator if we've gotten to this point and dryrun isn't set
     if (!argv.d) {
-      console.log(`Removing user '${uname}' from collaborators on ${org}/${repo}`);
+      logger.info(`Removing user '${uname}' from collaborators on ${org}/${repo}`);
       await wrap.removeUserAsCollaborator(org, repo, uname);
     } else {
-      console.log(`Dry run set, would have removing user '${uname}' from collaborators on ${org}/${repo}`);
+      logger.verbose(`Dry run set, would have removing user '${uname}' from collaborators on ${org}/${repo}`);
     }
   }
   return true;
@@ -450,12 +455,12 @@ async function removeRepoExternalContributors(project, org, repo) {
 
 async function removeOrgExternalContributors(projects, org) {
   if (argv.V === true) {
-    console.log(`Sync:removeOrgExternalContributors(projects = ${JSON.stringify(projects)}, org = ${org})`);
+    logger.debug(`Sync:removeOrgExternalContributors(projects = ${JSON.stringify(projects)}, org = ${org})`);
   }
   // get the collaborators
   var collaborators = await wrap.getOrgCollaborators(org);
   if (collaborators === undefined) {
-    console.log(`Error while fetching collaborators for ${org}`);
+    logger.error(`Error while fetching collaborators for ${org}`);
     return;
   }
   // check if we have collaborators to process
@@ -466,7 +471,7 @@ async function removeOrgExternalContributors(projects, org) {
   // project in the org
   for (var collabIdx in collaborators) {
     var uname = collaborators[collabIdx].login;
-    console.log(`Checking collaborator '${uname}'...`);
+    logger.verbose(`Checking collaborator '${uname}'...`);
 
     var isBot = false;
     var botKeys = Object.keys(bots);
@@ -474,7 +479,7 @@ async function removeOrgExternalContributors(projects, org) {
       var botList = bots[botKeys[botIdx]];
       // check if the current user is in the current key-values list
       if (botList.indexOf(uname) !== -1) {
-        console.log(`Found user '${uname}' in bot list for project '${botKeys[botIdx]}', checking organizations`);
+        logger.verbose(`Found user '${uname}' in bot list for project '${botKeys[botIdx]}', checking organizations`);
         // if we can determine that this user could be a bot, check that its
         // valid for current org
         for (var pIdx in projects) {
@@ -483,7 +488,7 @@ async function removeOrgExternalContributors(projects, org) {
           // and if the project has repositories within the given org
           if (project.project_id === botKeys[botIdx] && project.pp_orgs.indexOf(org) !== -1) {
             isBot = true;
-            console.log(`Discovered bot account for '${botKeys[botIdx]}' in org ${org}`);
+            logger.verbose(`Discovered bot account for '${botKeys[botIdx]}' in org ${org}`);
             break;
           }
         }
@@ -495,16 +500,16 @@ async function removeOrgExternalContributors(projects, org) {
     }
     // check if the user was flagged as a bot for the current org
     if (isBot) {
-      console.log(`Keeping '${uname}' as it was detected to be a bot for org '${org}'`);
+      logger.verbose(`Keeping '${uname}' as it was detected to be a bot for org '${org}'`);
       continue;
     }
 
     // remove collaborator if we've gotten to this point and dryrun isn't set
     if (!argv.d) {
-      console.log(`Removing user '${uname}' from collaborators on org '${org}'`);
+      logger.info(`Removing user '${uname}' from collaborators on org '${org}'`);
       await wrap.removeUserAsOutsideCollaborator(org, uname);
     } else {
-      console.log(`Dry run set, would have removing user '${uname}' from collaborators on ${org}`);
+      logger.verbose(`Dry run set, would have removing user '${uname}' from collaborators on ${org}`);
     }
   }
 }
@@ -514,7 +519,7 @@ function isUserBot(uname, project) {
     var botList = bots[project.project_id];
     // check if the current user is in the current key-values list for project
     if (botList && botList.indexOf(uname) !== -1) {
-      console.log(`Found user '${uname}' in bot list for project '${project.project_id}'`);
+      logger.info(`Found user '${uname}' in bot list for project '${project.project_id}'`);
       return true;
     }
   }

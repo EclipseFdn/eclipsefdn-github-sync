@@ -1,6 +1,7 @@
 const HOUR_IN_SECONDS = 3600;
 const EXIT_ERROR_STATE = 1;
 
+const { getLogger } = require('./logger.js');
 const axios = require('axios');
 const parse = require('parse-link-header');
 const { ClientCredentials } = require('simple-oauth2');
@@ -13,6 +14,8 @@ module.exports = class EclipseAPI {
   set verbose(val) {
     if (typeof val === 'boolean') {
       this.#verbose = val;
+      // update logger as well as it is dependent
+      this.#logger = getLogger(this.#verbose ? 'debug' : 'info', 'EclipseAPI');
     }
   }
   get verbose() {
@@ -27,6 +30,7 @@ module.exports = class EclipseAPI {
       this.#testMode = testMode;
     }
   }
+  #logger;
 
   constructor(config = {}) {
     this.#config = config;
@@ -45,11 +49,12 @@ module.exports = class EclipseAPI {
       };
       this.#client = new ClientCredentials(oauth);
     }
+    this.#logger = getLogger('info', 'EclipseAPI');
   }
 
   async eclipseAPI(queryStringParams = '', paginate = true) {
     if (this.#verbose) {
-      console.log(`EclipseAPI:eclipseAPI(queryStringParams = ${queryStringParams}, paginate = ${paginate})`);
+      this.#logger.debug(`EclipseAPI:eclipseAPI(queryStringParams = ${queryStringParams}, paginate = ${paginate})`);
     }
     // if test mode is enabled, return data that doesn't impact production
     if (this.#testMode) {
@@ -96,7 +101,7 @@ module.exports = class EclipseAPI {
     var url = 'https://projects.eclipse.org/api/projects' + queryStringParams;
     // loop through all available users, and add them to a list to be returned
     do {
-      console.log('Loading next page...');
+      this.#logger.silly('Loading next page...');
       // get the current page of results, incrementing page count after call
       result = await axios.get(url).then(r => {
         // return the data to the user
@@ -107,7 +112,7 @@ module.exports = class EclipseAPI {
           url = links.next.url;
         }
         return r.data;
-      }).catch(err => console.log(`Error while retrieving results from Eclipse Projects API (${url}): ${err}`));
+      }).catch(err => this.#logger.error(`Error while retrieving results from Eclipse Projects API (${url}): ${err}`));
 
       // collect the results
       if (result != null && result.length > 0) {
@@ -121,7 +126,7 @@ module.exports = class EclipseAPI {
 
   postprocessEclipseData(data, param) {
     if (this.#verbose) {
-      console.log(`EclipseAPI:postprocessEclipseData(data = ${JSON.stringify(data)}, param = ${param})`);
+      this.#logger.debug(`EclipseAPI:postprocessEclipseData(data = ${JSON.stringify(data)}, param = ${param})`);
     }
     for (var key in data) {
       var project = data[key];
@@ -137,12 +142,12 @@ module.exports = class EclipseAPI {
         var repo = repos[idx];
         var repoUrl = repo.url;
 
-        console.log(`Checking repo URL: ${repoUrl}`);
+        this.#logger.debug(`Checking repo URL: ${repoUrl}`);
         // strip the repo url to get the org + repo
         var match = /.*\/([^/]+)\/([^/]+)\/?$/.exec(repoUrl);
         // check to make sure we got a match
         if (match === null) {
-          console.log(`No match for URL ${repoUrl}`);
+          this.#logger.warn(`No match for URL ${repoUrl}`);
           continue;
         }
 
@@ -153,11 +158,11 @@ module.exports = class EclipseAPI {
         repo.org = org;
         repo.repo = repoName;
         if (project.pp_orgs.indexOf(org) === -1) {
-          console.log(`Found new match, registered org=${org}`);
+          this.#logger.verbose(`Found new match, registered org=${org}`);
           project.pp_orgs.push(org);
         }
         if (project.pp_repos.indexOf(repoName) === -1) {
-          console.log(`Found match, registered repo=${repoName}`);
+          this.#logger.verbose(`Found match, registered repo=${repoName}`);
           project.pp_repos.push(repoName);
         }
       }
@@ -169,7 +174,7 @@ module.exports = class EclipseAPI {
 
   async eclipseUser(username) {
     if (this.#verbose) {
-      console.log(`EclipseAPI:eclipseUser(username = ${username})`);
+      this.#logger.debug(`EclipseAPI:eclipseUser(username = ${username})`);
     }
     return await axios.get('https://api.eclipse.org/account/profile/' + username, {
       headers: {
@@ -177,18 +182,18 @@ module.exports = class EclipseAPI {
       },
     })
       .then(result => result.data)
-      .catch(err => console.log(err));
+      .catch(err => this.#logger.error(err));
   }
 
   async eclipseBots() {
     if (this.#verbose) {
-      console.log('EclipseAPI:eclipseBots()');
+      this.#logger.debug('EclipseAPI:eclipseBots()');
     }
     var botsRaw = await axios.get('https://api.eclipse.org/bots')
       .then(result => result.data)
-      .catch(err => console.log(err));
+      .catch(err => this.#logger.error(err));
     if (botsRaw === undefined || botsRaw.length <= 0) {
-      console.log('Could not retrieve bots from API');
+      this.#logger.error('Could not retrieve bots from API');
       process.exit(EXIT_ERROR_STATE);
     }
     return botsRaw;
@@ -196,7 +201,7 @@ module.exports = class EclipseAPI {
 
   processBots(botsRaw, site = 'github.com') {
     if (this.#verbose) {
-      console.log(`EclipseAPI:processBots(botsRaw = ${JSON.stringify(botsRaw)}, site = ${site})`);
+      this.#logger.debug(`EclipseAPI:processBots(botsRaw = ${JSON.stringify(botsRaw)}, site = ${site})`);
     }
     var botMap = {};
     for (var botIdx in botsRaw) {
@@ -220,7 +225,7 @@ module.exports = class EclipseAPI {
           scope: this.#config.oauth.scope,
         });
       } catch (error) {
-        console.log('Access Token error', error);
+        this.#logger.error(error);
         process.exit(EXIT_ERROR_STATE);
       }
       return this.#accessToken.token.access_token;
