@@ -189,7 +189,7 @@ async function run(secret, eclipseToken) {
       // retrieving current project
       var p = await getProject(extRepo.repo, projGroup);
       if (p !== undefined) {
-        logger.info(`Project with ID ${p.id} created for repository target ${extRepo.url}`);
+        await cleanUpProjectUsers(p, project.short_project_id);
       }
     }
   }
@@ -231,13 +231,37 @@ async function removeAdditionalUsers(expectedUsers, group, projectID) {
   }
 }
 
+async function cleanUpProjectUsers(project, projectID) {
+  if (argv.V) {
+    logger.debug(`GitlabSync:cleanUpProjectUsers(project = ${project.id})`);
+  }
+  var projectMembers = await api.ProjectMembers.all(project.id, { includeInherited: false });
+  for (var idx in projectMembers) {
+    let member = projectMembers[idx];
+    // skip bot user or admin users
+    if (isBot(member.username, projectID) || member.access_level === ADMIN_PERMISSIONS_LEVEL) {
+      continue;
+    }
+    if (argv.d) {
+      logger.debug(`Dryrun flag active, would have removed user '${member.username}' from project '${project.name}'(${project.id})`);
+      continue;
+    }
+    console.log(`Removing user '${member.username}' from project '${project.name}'(${project.id})`);
+    try {
+      await api.ProjectMembers.remove(project.id, member.id);
+    } catch (err) {
+      if (argv.V) {
+        logger.error(err);
+      }
+      logger.error(`Error while removing user '${member.username}' from project '${project.name}'(${project.id})`);
+    }
+  }
+}
+
 function isBot(uname, projectID) {
   var botList = bots[projectID];
   // check if the current user is in the current key-values list
-  if (botList !== undefined && botList.indexOf(uname) !== -1) {
-    return true;
-  }
-  return false;
+  return botList !== undefined && botList.indexOf(uname) !== -1;
 }
 
 
