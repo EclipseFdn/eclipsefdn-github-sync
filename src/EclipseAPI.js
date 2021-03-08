@@ -1,3 +1,16 @@
+/*! **************************************************************
+ Copyright (C) 2021 Eclipse Foundation, Inc.
+
+ This program and the accompanying materials are made
+ available under the terms of the Eclipse Public License 2.0
+ which is available at https://www.eclipse.org/legal/epl-2.0/
+
+  Contributors:
+    Martin Lowe <martin.lowe@eclipse-foundation.org>
+
+ SPDX-License-Identifier: EPL-2.0
+**************************************************************** */
+
 const HOUR_IN_SECONDS = 3600;
 const EXIT_ERROR_STATE = 1;
 
@@ -169,6 +182,19 @@ module.exports = class EclipseAPI {
       console.log(`EclipseAPI:eclipseUser(username = ${username})`);
     }
     return await axios.get('https://api.eclipse.org/account/profile/' + username, {
+      headers: {
+        Authorization: `Bearer ${await this._getAccessToken()}`,
+      },
+    })
+      .then(result => result.data)
+      .catch(err => console.log(err));
+  }
+
+  async eclipseUserByEmail(email) {
+    if (this.#verbose) {
+      console.log(`EclipseAPI:eclipseUserByEmail(email = ${email})`);
+    }
+    return await axios.get('https://api.eclipse.org/account/profile?mail=' + email, {
       headers: {
         Authorization: `Bearer ${await this._getAccessToken()}`,
       },

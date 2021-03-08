@@ -31,7 +31,7 @@ The project maintains the following source code repositories:
 
 ## Third-party Content
 
-### @octokit/rest.js (16.28.7)
+### @octokit/rest (18.0.3)
 
 * License: The MIT License (MIT)
 
@@ -74,3 +74,7 @@ The project maintains the following source code repositories:
 ### ESLint-config-strongloop (2.1.0)
 
 * License: The Artistic License
+
+### bz (0.4.5)
+
+* License: The MIT License (MIT)
