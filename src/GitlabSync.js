@@ -513,12 +513,10 @@ function getUserList(project) {
   // add the project leads not yet tracked with reporter access
   var keys = Object.keys(l);
   for (var plIdx in project.project_lead) {
-    if (!keys.contains(project.project_lead[plIdx].username)) {
-      l[project.project_lead[plIdx].username] = {
-        url: project.project_lead[plIdx].url,
-        access_level: 40,
-      };
-    }
+    l[project.project_lead[plIdx].username] = {
+      url: project.project_lead[plIdx].url,
+      access_level: 40,
+    };
   }
   // add the bots with developer access
   var botList = bots[project.project_id];
