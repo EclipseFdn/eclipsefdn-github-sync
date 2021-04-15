@@ -301,7 +301,7 @@ async function processOrg(org, team) {
   var teamName = wrap.sanitizeTeamName(team.name);
   // create the teams for the current org
   if (!argv.d) {
-    await updateTeam(org, teamName, team.members, project);
+    await updateTeam(org, teamName, team.members, undefined);
   } else {
     console.log(`Dry run set, not adding team '${teamName}' for org: ${org}`);
     if (argv.V) {
@@ -510,11 +510,13 @@ async function removeOrgExternalContributors(projects, org) {
 }
 
 function isUserBot(uname, project) {
-  var botList = bots[project.project_id];
-  // check if the current user is in the current key-values list for project
-  if (botList.indexOf(uname) !== -1) {
-    console.log(`Found user '${uname}' in bot list for project '${project.project_id}'`);
-    return true;
+  if (project !== undefined) {
+    var botList = bots[project.project_id];
+    // check if the current user is in the current key-values list for project
+    if (botList.indexOf(uname) !== -1) {
+      console.log(`Found user '${uname}' in bot list for project '${project.project_id}'`);
+      return true;
+    }
   }
   return false;
 }
