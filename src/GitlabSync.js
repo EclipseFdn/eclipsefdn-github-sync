@@ -511,7 +511,6 @@ function getUserList(project) {
     };
   }
   // add the project leads not yet tracked with reporter access
-  var keys = Object.keys(l);
   for (var plIdx in project.project_lead) {
     l[project.project_lead[plIdx].username] = {
       url: project.project_lead[plIdx].url,
