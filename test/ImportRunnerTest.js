@@ -26,7 +26,13 @@ describe('ImportRunner', function () {
   // run before each test to create new mocks and clear state
   beforeEach(function () {
     ghMock = sinon.mock(GH_BASE_WRAPPER);
-    glMock = sinon.mock(GL_BASE_WRAPPER);
+    glMock = {
+      Groups: {
+        show: function () {},
+        create: function () {},
+        remove: function () {},
+      },
+    };
     runner = new ImportRunner();
     runner.gitlab = glMock;
     runner.github = ghMock;
@@ -34,45 +40,45 @@ describe('ImportRunner', function () {
     runner.gitlabAccessToken = GITLAB_SECRET;
   });
 
-  describe('constructor', function() {
-    it('should have a valid no-op constructor', function(){
+  describe('constructor', function () {
+    it('should have a valid no-op constructor', function () {
       expect(new ImportRunner()).to.not.be.null.and.to.not.throw;
-    })
-  })
+    });
+  });
 
-  describe('field_access', function() {
-    it('should block get for Gitlab secret', function() {
+  describe('field_access', function () {
+    it('should block get for Gitlab secret', function () {
       expect(runner.gitlabAccessToken).to.be.null;
     });
-    it('should allow set for Gitlab secret', function() {
+    it('should allow set for Gitlab secret', function () {
       let tempRunner = new ImportRunner();
-      expect(() => tempRunner.gitlabAccessToken = 'new value').to.not.throw;
+      expect(() => (tempRunner.gitlabAccessToken = 'new value')).to.not.throw;
     });
-    it('should block get for Github secret', function() {
+    it('should block get for Github secret', function () {
       expect(runner.githubAccessToken).to.be.null;
     });
-    it('should allow set for Github secret', function() {
+    it('should allow set for Github secret', function () {
       let tempRunner = new ImportRunner();
-      expect(() => tempRunner.githubAccessToken = 'new value').to.not.throw;
+      expect(() => (tempRunner.githubAccessToken = 'new value')).to.not.throw;
     });
-    it('should allow get for Github wrapper', function() {
+    it('should allow get for Github wrapper', function () {
       expect(runner.github).to.eq(ghMock);
     });
-    it('should allow set for Github secret', function() {
+    it('should allow set for Github secret', function () {
       let tempRunner = new ImportRunner();
-      expect(() => tempRunner.github = {}).to.not.throw;
+      expect(() => (tempRunner.github = {})).to.not.throw;
     });
-    it('should allow get for Gitlab wrapper', function() {
+    it('should allow get for Gitlab wrapper', function () {
       expect(runner.gitlab).to.eq(glMock);
     });
-    it('should allow set for Gitlab secret', function() {
+    it('should allow set for Gitlab secret', function () {
       let tempRunner = new ImportRunner();
-      expect(() => tempRunner.gitlab = {}).to.not.throw;
+      expect(() => (tempRunner.gitlab = {})).to.not.throw;
     });
   });
 
   describe('#checkRunner()', function () {
-    checkRunnerTestSuite(async function(runner) {
+    checkRunnerTestSuite(async function (runner) {
       return await runner.checkRunner(getTestConfig());
     });
   });
@@ -80,19 +86,118 @@ describe('ImportRunner', function () {
   describe('#runBackup', function () {
     // run backup should be held to same requirements as checkRunner
     describe('_checkRunner()', function () {
-      checkRunnerTestSuite(async function(runner) {
+      checkRunnerTestSuite(async function (runner) {
         return await runner.runBackup(getTestConfig());
       });
     });
-
   });
 
-  describe('#pruneBackupGroups', function() {
-    describe('success', function() {
-      it('should ')
-    });
-    describe('failure', function() {
+  describe('#getBackupGroups', function () {
+    describe('success', function () {
+      it('should make call to Gitlab for group using ID', async function () {
+        let id = faker.datatype.number;
+        // create the mock object to watch the process
+        let mock = sinon.mock(glMock.Groups);
+        mock.expects('show').once().withArgs(id);
 
+        await runner.getBackupGroups({ id: id });
+        // verify it was called once
+        mock.verify();
+      });
+      it('should return data without modification', async function () {
+        // no modification ensures that we can always follow GL API spec
+        let id = faker.datatype.number;
+        let sampleData = [
+          {
+            id: faker.datatype.number,
+            name: 'Sample subgroup 1',
+            parent_id: id,
+          },
+          {
+            id: faker.datatype.number,
+            name: 'Sample subgroup 2',
+            parent_id: id,
+          },
+        ];
+        // create the mock object to watch the process
+        let mock = sinon.mock(glMock.Groups);
+        mock.expects('show').once().withArgs(id).returns(sampleData);
+
+        // should return the data in exact format
+        expect(await runner.getBackupGroups({ id: id })).to.eq(sampleData);
+        // verify it was called once
+        mock.verify();
+      });
+    });
+    describe('failure', function () {
+      it('should catch exceptions and not bubble up', async function () {
+        let id = faker.datatype.number;
+        // create the mock object to watch the process
+        let mock = sinon.mock(glMock.Groups);
+        mock.expects('show').once().withArgs(id).throws();
+
+        // should return an empty response on failure
+        expect(await runner.getBackupGroups({ id: id })).to.be.undefined.and.not
+          .throw;
+        // verify it was called once
+        mock.verify();
+      });
+    });
+  });
+
+  describe('#createBackupGroup', function () {
+    describe('success', function () {
+      it('should make a call to create a group', async function () {
+        let id = faker.datatype.number;
+        let name = faker.datatype.string;
+        // create the mock object to watch the process
+        let mock = sinon.mock(glMock.Groups);
+        // don't expect the args, as they would be brittle in this case
+        mock
+          .expects('create')
+          .once();
+        // should return an empty response on failure
+        expect(await runner.createBackupGroup({}, name, id)).to.not.throw;
+        // verify it was called once
+        mock.verify();
+      });
+      it('should return the exact new group to the caller', async function () {
+        let id = faker.datatype.number;
+        let name = faker.datatype.string;
+        let sampleData = {
+          id: faker.datatype.number,
+          name: faker.datatype.string,
+        };
+        // create the mock object to watch the process
+        let mock = sinon.mock(glMock.Groups);
+        // don't expect the args, as they would be brittle in this case
+        mock
+          .expects('create')
+          .once().returns(sampleData);
+        // should return an empty response on failure
+        expect(await runner.createBackupGroup({}, name, id)).to.eq(sampleData);
+        // verify it was called once
+        mock.verify();
+      });
+    });
+    describe('failure', function () {
+      it('should catch exceptions and not bubble up', async function () {
+        let id = faker.datatype.number;
+        let name = faker.datatype.string;
+        // create the mock object to watch the process
+        let mock = sinon.mock(glMock.Groups);
+        // don't expect the args, as they would be brittle in this case
+        mock
+          .expects('create')
+          .once()
+          .throws();
+
+        // should return an empty response on failure
+        expect(await runner.createBackupGroup({}, name, id)).to.be.undefined.and
+          .not.throw;
+        // verify it was called once
+        mock.verify();
+      });
     });
   });
 });

@@ -117,6 +117,7 @@ class ImportRunner {
    * Creates a subgroup within a targeted group in Gitlab to contain backups. This group will inherit the permissions of
    * the parent, so if the parent is visible, this group will also be visible.
    *
+   * @param {*} config the configuration for the current run for use in logging
    * @param {String} name name of the backup group to create. This should be URL friendly (lowercase, dashed)
    * @param {String} parentID the ID of the parent group to contain the backup container
    * @returns the new Gitlab group definition, or undefined if there was an error
