@@ -133,7 +133,7 @@ async function run(secret, eclipseToken) {
     if (argv.d) {
       logger.error('Unable to start sync of GitLab content. Base Eclipse group could not be found and dryrun is set');
     } else {
-      logger.errpr('Unable to start sync of GitLab content. Base Eclipse group could not be created');
+      logger.error('Unable to start sync of GitLab content. Base Eclipse group could not be created');
     }
     return;
   }
@@ -141,7 +141,7 @@ async function run(secret, eclipseToken) {
   for (projectIdx in data) {
     var project = data[projectIdx];
     if (argv.P !== undefined && project.short_project_id !== argv.P) {
-      console.log(`Project target set ('${argv.P}'). Skipping non-matching project ID ${project.short_project_id}`);
+      logger.info(`Project target set ('${argv.P}'). Skipping non-matching project ID ${project.short_project_id}`);
       continue;
     }
     logger.info(`Processing '${project.short_project_id}'`);
@@ -246,7 +246,7 @@ async function cleanUpProjectUsers(project, projectID) {
       logger.debug(`Dryrun flag active, would have removed user '${member.username}' from project '${project.name}'(${project.id})`);
       continue;
     }
-    console.log(`Removing user '${member.username}' from project '${project.name}'(${project.id})`);
+    logger.info(`Removing user '${member.username}' from project '${project.name}'(${project.id})`);
     try {
       await api.ProjectMembers.remove(project.id, member.id);
     } catch (err) {
@@ -441,7 +441,7 @@ async function getUser(uname, url) {
   var u = namedUsers[uname];
   if (u === undefined) {
     if (argv.d) {
-      console.log(`Dryrun is enabled. Would have created user ${uname} but was skipped`);
+      logger.info(`Dryrun is enabled. Would have created user ${uname} but was skipped`);
       return;
     }
 
