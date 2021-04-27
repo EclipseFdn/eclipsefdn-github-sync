@@ -1,0 +1,92 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: eclipsefdn-import-backup
+  namespace: foundation-internal-webdev-apps
+spec:
+  schedule: "0 1 * * 0"
+  # if it is time for a new job run and the previous job run hasn’t finished yet, the cron job skips the new job run
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - preference:
+                  matchExpressions:
+                  - key: speed
+                    operator: NotIn
+                    values:
+                    - fast
+                weight: 1
+          containers:
+          - name: eclipsefdn-import-backup
+            image: eclipsefdn/eclipsefdn-import-backup:latest
+            imagePullPolicy: Always # TODO: change to IfNotPresent once the deploy step is integrated into CD
+            args:
+            - /bin/sh
+            - -c
+            - npm run import-backup -- --verbose=true --host="https://gitlab.eclipse.org" --tls-min-v1.0 --target=openhw-group/github-backup --organization=openhwgroup 2>&1 | tee -a /app/logs/import-stdout-$(date +%Y-%m-%d).log
+            volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+            - name: cache
+              mountPath: /app/.cache
+            - name: import-backup-secrets
+              mountPath: "/run/secrets/access-token"
+              readOnly: true
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              subPath: access-token
+            - name: import-sync-secrets
+              mountPath: "/run/secrets/github-access-token"
+              readOnly: true
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              subPath: github-access-token
+          restartPolicy: Never
+          volumes:
+          - name: logs
+            persistentVolumeClaim:
+              claimName: import-backup-logs
+          - name: cache
+            emptyDir: {}
+          - name: import-backup-secrets
+            secret:
+              secretName: import-backup-secrets
+              # workaround https://github.com/kubernetes/kubernetes/issues/65835
+              items:
+              - key: access-token
+                path: access-token
+              - key: github-access-token
+                path: github-access-token
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: import-backup-logs
+  annotations:
+    volume.beta.kubernetes.io/mount-options: rw,nfsvers=3,noexec
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  claimRef:
+    namespace: foundation-internal-webdev-apps
+    name: import-backup-logs
+  nfs:
+    server: fred
+    path: /opt/export/eclipsefdn-import-backup/logs
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: import-backup-logs
+  namespace: foundation-internal-webdev-apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

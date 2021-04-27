@@ -12,7 +12,8 @@
     "start": "node src/Sync.js -c",
     "pretest": "eslint --ignore-path .gitignore .",
     "test": "mocha --timeout 60000",
-    "lab-sync": "node src/GitlabSync.js -c"
+    "lab-sync": "node src/GitlabSync.js -c",
+    "import-backup": "node src/auto_backup/Import.js"
   },
   "license": "EPL-2.0",
   "bugs": {
