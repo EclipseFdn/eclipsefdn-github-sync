@@ -166,7 +166,11 @@ class StaticTeamManager {
   }
 
   getPermissionsForTeam(team, serviceType) {
-    if (team === null || serviceType === null) {
+    if (team === null) {
+      this.#logger.warn('Cannot get permissions for null team');
+      return null;
+    }
+    if (serviceType === null) {
       this.#logger.warn(`Cannot get permissions for team ${team.teamName} with no service type`);
       return null;
     }

@@ -68,7 +68,7 @@ describe('HttpWrapper', function() {
 				result = await http.getData("https://api.eclipse.org/account/profile/webmaster-123456789456123");
 			});
 
-			it('should return undefiend as response for error', function() {
+			it('should return undefined as response for error', function() {
 				expect(result).to.be.undefined;
 			});
 		});

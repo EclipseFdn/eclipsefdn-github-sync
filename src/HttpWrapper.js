@@ -67,7 +67,9 @@ class HttpWrapper {
         this.#httpCache.setKey(url, result.data);
         return result.data;
       })
-      .catch(err => this.#logger.error(err));
+      .catch(err => {
+        this.#logger.error(err);
+      });
   }
 
   async getRaw(url) {

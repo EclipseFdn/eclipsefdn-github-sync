@@ -26,9 +26,9 @@ module.exports.getLogger = function(level, name = 'main') {
     level: level,
     format: format.combine(
       format.timestamp({
-        format: 'YYYY-MM-DDTHH:mm:ss'
+        format: 'YYYY-MM-DDTHH:mm:ss',
       }),
-      format.printf((info) => {
+      format.printf(info => {
         return `${info.timestamp} [${name}] ${info.level.toUpperCase()} ${info.message}`;
       })),
     transports: [
