@@ -203,16 +203,29 @@ module.exports = class EclipseAPI {
     if (this.#verbose) {
       this.#logger.debug(`EclipseAPI:processBots(botsRaw = ${JSON.stringify(botsRaw)}, site = ${site})`);
     }
+    let rgx = new RegExp(`^${site}.*`);
     var botMap = {};
     for (var botIdx in botsRaw) {
       var bot = botsRaw[botIdx];
-      if (bot[site] === undefined) continue;
-
+      // get the list of bots for project if already created
       var projBots = botMap[bot['projectId']];
       if (projBots === undefined) {
         projBots = [];
       }
-      projBots.push(bot[site]['username']);
+      // get usernames for site + sub resource bots
+      let botKeys = Object.keys(bot);
+      for (let idx in botKeys) {
+        let key = botKeys[idx];
+        // if there is a match (either direct or sub resource match) push the bot name to the list
+        let match = key.match(rgx);
+        if (match) {
+          projBots.push(bot[key]['username']);
+        }
+      }
+      // dont add empty arrays to output
+      if (projBots.length === 0) {
+        continue;
+      }
       botMap[bot['projectId']] = projBots;
     }
     return botMap;

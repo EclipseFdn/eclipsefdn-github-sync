@@ -119,40 +119,41 @@ describe('EclipseAPI', function() {
 			var siteName;
 			before(async function() {
 				// get current bots and find a site name to filter on
-				var temp = await EclipseAPI.eclipseBots();
-				for (var tempIdx in temp) {
-					var keys = Object.keys(temp[tempIdx]);
-					// look for a key with a dot that separates the domain from server name e.g. google.com
-					var newKeys = keys.filter(k => k.indexOf('.') != -1);
-					if (newKeys.length > 0) {
-						siteName = newKeys[0];
-						break;
-					}
-				}
-				// if we couldn't find a proper site name, fail out
-				if (siteName == undefined) {
-					done(false);
-				}
-
-				// grab a slice of data that contains the site discovered previously
-				var sliceSize = 10;
-				var sliceIdx = 0;
-				var hasBot = false;
-				while (!hasBot && sliceIdx < temp.length) {
-					bots = temp.slice(sliceIdx, sliceSize);
-					sliceIdx += sliceSize;
-					for (var botIdx in bots) {
-						if (bots[botIdx][siteName] != undefined){
-							hasBot = true;
-							break;
+				bots = [
+					{
+						"id": 1,
+						"projectId": "ecd.che",
+						"username": "genie.che",
+						"email": "che-bot@eclipse.org",
+						"github.com": {
+						  "username": "che-bot",
+						  "email": "che-bot@eclipse.org"
+						},
+						"github.com-openshift-ci-robot": {
+						  "username": "openshift-ci-robot",
+						  "email": "openshift-ci-robot@users.noreply.github.com"
+						},
+						"github.com-openshift-merge-robot": {
+						  "username": "openshift-merge-robot",
+						  "email": "openshift-merge-robot@users.noreply.github.com"
+						},
+						"non-gh-bot-sample": {
+						  "username": "non-gh-bot",
+						  "email": "non-gh-bot@test.com"
+						}
+					},
+					{
+						"id": 11,
+						"projectId": "eclipse.jdt",
+						"username": "genie.jdt",
+						"email": "jdt-bot@eclipse.org",
+						"oss.sonatype.org": {
+						  "username": "jdt-dev",
+						  "email": "jdt-dev@eclipse.org"
 						}
 					}
-				}
-				// if we couldn't find any bots, fail out
-				if (!hasBot) {
-					done(false);
-				}
-				
+				];
+				siteName = "github.com";
 				// get bots with filtered list
 				result = EclipseAPI.processBots(bots, siteName);
 			});
@@ -164,24 +165,18 @@ describe('EclipseAPI', function() {
 				// get the project IDs of bots that have an entry for the current site
 				var projectNames = [];
 				bots.forEach(b => b[siteName] != undefined ? projectNames.push(b.projectId): null);
-				
-				expect(result).to.have.all.keys(projectNames);
+				expect(result).to.have.keys(projectNames);
 			});
 			it('should contain keys that have at least 1 user associated', function() {
 				for (var resultIdx in result) {
 					expect(result[resultIdx]).to.be.an('array').that.is.not.empty;
 				}
+				// expect that the JDT project isn't included (no github.com bot)
+				expect(result['eclipse.jdt']).to.be.undefined;
 			});
 			it('should contain keys that only have valid users associated', function() {
-				// get the project IDs of bots that have an entry for the current site
-				var botNames = [];
-				bots.forEach(b => b[siteName] != undefined ? botNames.push(b[siteName].username): null);
-				for (var resultIdx in result) {
-					var users = result[resultIdx];
-					for (var userIdx in users) {
-						expect(users[userIdx]).to.be.a('string').that.is.oneOf(botNames);
-					}
-				}
+				// check that the ECD Che project gets included
+				expect(result['ecd.che']).to.include.members(['openshift-ci-robot', 'openshift-merge-robot', 'che-bot']);
 			});
 		});
 	});
