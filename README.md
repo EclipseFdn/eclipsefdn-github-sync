@@ -2,7 +2,7 @@
 
 The Eclipse Foundation toolkit for maintaining permissions across multiple version-control platforms. This includes scripts for syncronizing user permissions from PMI to Github or Gitlab, running automated backups of repositories, and managing bot access through a variety of means.
 
-## [∞](#table-of-contents) Table of Contents
+## Table of Contents
 <!-- TOC -->
 - [Table of Contents](#table-of-contents)
 - [Gaining Access to a project](#gaining-access-to-a-project)
@@ -20,7 +20,7 @@ The Eclipse Foundation toolkit for maintaining permissions across multiple versi
 - [Copyright and license](#copyright-and-license)
 <!-- /TOC -->
 
-## [∞](#gaining-access-to-a-project) Gaining Access to a project
+## Gaining Access to a project
 
 To be granted access to a repository through the Eclipse Sync scripts (Gitlab or Github), a user must first either be nominated as a committer or a project lead within the [PMI(projects management infrastructure)](https://wiki.eclipse.org/Project_Management_Infrastructure), or be added as a contributor by an active committer or project lead. Depending on the role granted within the PMI, different access rights will be granted through the sync scripts. Should a user be promoted or retired within a project, the new permission sets should be active within a few hours of finalization.
 
@@ -30,7 +30,7 @@ The Eclipse Foundation supports granting permissions from triage to maintain per
 
 _[^ Back to top](#eclipsefdn-github-sync)_  
 
-## [∞](#github-sync) Github Sync  
+## Github Sync  
 
 Within Github, there is a mixed strategy for management of projects within the space. Projects that are started while under the Eclipse umbrella or from a project that was incepted within the Eclipse ecosystem are by default created under the central Eclipse organization. On request, projects can be migrated to a separate organization that is still managed by the EclipseWebmaster account. Repositories or projects born from organizations or groups that have joined Eclipse Foundation post inception are usually managed under organizations managed by the EclipseWebmaster. While there are cases where projects can cross organizational bounds, it is uncommon (and covered by the sync script). 
 
@@ -53,7 +53,7 @@ locationtech/
 ├─ locationtech-spatial4j-committers (private team, access to spatial4j)
 ```
 
-### [∞](#github-permissions-mapping) Github Permissions mapping
+### Github Permissions mapping
 
 Information on Github permissions is available in the [documentation for organizations](https://docs.github.com/en/github/setting-up-and-managing-organizations-and-teams/repository-permission-levels-for-an-organization).
 
@@ -66,7 +66,7 @@ Information on Github permissions is available in the [documentation for organiz
 
 _[^ Back to top](#eclipsefdn-github-sync)_
 
-## [∞](#gitlab-sync) Gitlab Sync
+## Gitlab Sync
 In Gitlab, a nested group strategy was chosen to manage access to both groups and projects. This gives greater control over inherited permissions without having to manage teams across multiple base groups. For each Open Source group with repositories managed by the Eclipse Foundation (such as Eclipse Foundation and the OpenHWGroup), a base group will exist to encapsulate all projects for that group. Within each of these groups, each active project will have a subgroup (such as Eclipse Dash and Eclipse Marketplace Client) that will manage permissions for all repositories active within the Gitlab instance. 
 
 In regards to bot access, this can be granted at either the subgroup or project (repository) level depending on the needs of the project. These permissions, while not removed by the script are currently managed manually by the Eclipse Foundation. If there are issues regarding bot access, new or existing, an issue should be created within our [bug-tracking system](https://bugs.eclipse.org) rather than within this project.
@@ -86,7 +86,7 @@ Eclipse Foundation/ (group)
 │  ├─ eclipsefdn-api-common (project)
 ``` 
 
-### [∞](#gitlab-permissions-mapping) Gitlab Permissions mapping
+### Gitlab Permissions mapping
 
 More information on Gitlab permissions can be found in the [API documentation](https://docs.gitlab.com/ee/user/permissions.html).
 
@@ -98,12 +98,12 @@ More information on Gitlab permissions can be found in the [API documentation](h
   
   
 _[^ Back to top](#eclipsefdn-github-sync)_
-## [∞](#usage) Usage
-### [∞](#manual-run-parameters) Manual run parameters
+## Usage
+### Manual run parameters
 
 The following parameters can be used when running the sync scripts manually.
 
-#### [∞](#github) Github
+#### Github
 
 | Parameter name | Required | Accepts | Default | Description |
 |----------------|:--------:|---------|---------|-------------|
@@ -114,7 +114,7 @@ The following parameters can be used when running the sync scripts manually.
 |-h, --help | x | N/A (flag) | N/A | Prints the help text for the script parameters. |
 |-V, --verbose | x | boolean flag | `false` | Sets the script to run in verbose mode (ranges from 1-4 for more verbose logging). |
 
-#### [∞](#gitlab) Gitlab
+#### Gitlab
 
 | Parameter name | Required | Accepts | Default | Description |
 |----------------|:--------:|---------|---------|-------------|
@@ -126,7 +126,7 @@ The following parameters can be used when running the sync scripts manually.
 |-p, --provider | x | string | `oauth2_generic` | The OAuth provider name set in GitLab for the Eclipse Accounts binding. |
 |-V, --verbose | x | boolean flag | `false` | Sets the script to run in verbose mode (ranges from 1-4 for more verbose logging). |
 
-### [∞](#running-the-toolset-for-development) Running the toolset for development
+### Running the toolset for development
 
 By default, the script is run in docker containers to emulate the production environment (Openshift). This sync tool can be run in standard and verbose mode. The difference between the modes is that in verbose all log messages are printed to the STDOUT of the container.
 
@@ -146,18 +146,18 @@ docker run -i --rm -v <fullpath to current project folder>/secrets:/run/secrets 
 
 _[^ Back to top](#eclipsefdn-github-sync)_  
 
-## [∞](#maintainers) Maintainers
+## Maintainers
 
 **Martin Lowe (Eclipse Foundation)**
 
 - <https://github.com/autumnfound>
 
-## [∞](#trademarks) Trademarks
+## Trademarks
 
 * Eclipse® is a Trademark of the Eclipse Foundation, Inc.
 * Eclipse Foundation is a Trademark of the Eclipse Foundation, Inc.
 
-## [∞](#copyright-and-license) Copyright and license
+## Copyright and license
 
 Copyright 2019 the [Eclipse Foundation, Inc.](https://www.eclipse.org) and the [eclipsefdn-github-sync authors](https://github.com/eclipsefdn/eclipsefdn-github-sync/graphs/contributors). Code released under the [Eclipse Public License Version 2.0 (EPL-2.0)](https://github.com/eclipsefdn/eclipsefdn-github-sync/blob/master/LICENSE).
 
