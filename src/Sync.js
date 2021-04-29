@@ -19,6 +19,11 @@ const EclipseAPI = require('./EclipseAPI.js');
 var argv = require('yargs')
   .usage('Usage: $0 [options]')
   .example('$0', '')
+  .option('c', {
+    alias: 'console',
+    description: 'Print messages to console as well as to file logs',
+    boolean: true,
+  })
   .option('d', {
     alias: 'dryrun',
     description: 'Runs script as dry run, not writing any changes to API',
@@ -67,7 +72,7 @@ const API_MISSING_STATUS = 404;
 const EXIT_ERROR_STATE = 1;
 
 const { getLogger } = require('./logger.js');
-const logger = getLogger(argv.V ? 'debug' : 'info');
+const logger = getLogger(argv.V ? 'debug' : 'info', 'main', argv.c);
 const axios = require('axios');
 const { SecretReader, getBaseConfig } = require('./SecretReader.js');
 const { StaticTeamManager, ServiceTypes } = require('./teams/StaticTeamManager.js');

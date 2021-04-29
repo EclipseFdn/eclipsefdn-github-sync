@@ -9,10 +9,10 @@
   },
   "author": "Martin Lowe",
   "scripts": {
-    "start": "node src/Sync.js",
+    "start": "node src/Sync.js -c",
     "pretest": "eslint --ignore-path .gitignore .",
     "test": "mocha --timeout 60000",
-    "lab-sync": "node src/GitlabSync.js"
+    "lab-sync": "node src/GitlabSync.js -c"
   },
   "license": "EPL-2.0",
   "bugs": {

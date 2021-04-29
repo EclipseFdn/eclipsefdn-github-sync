@@ -21,8 +21,8 @@ Example of this format:
 2021-01-25T15:55:29 [main] INFO Generating teams for eclipsefdn-webdev/spider-pig
 2021-01-25T15:55:30 [SecretReader] ERROR An unknown error occurred while reading the secret
  */
-module.exports.getLogger = function(level, name = 'main') {
-  return createLogger({
+module.exports.getLogger = function(level, name = 'main', includeConsole = false) {
+  let logger = createLogger({
     level: level,
     format: format.combine(
       format.timestamp({
@@ -32,8 +32,12 @@ module.exports.getLogger = function(level, name = 'main') {
         return `${info.timestamp} [${name}] ${info.level.toUpperCase()} ${info.message}`;
       })),
     transports: [
-      new transports.Console(),
       new transports.File({ level: 'error', filename: 'error.log' }),
+      new transports.File({ level: level, filename: 'production.log' }),
     ],
   });
+  if (includeConsole) {
+    logger.add(new transports.Console({ level: level }));
+  }
+  return logger;
 };
