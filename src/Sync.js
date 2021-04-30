@@ -390,7 +390,7 @@ async function updateTeam(org, teamName, designatedMembers, project) {
           logger.debug(`Would have deleted '${members[i].login}', but in semi-dry run mode`);
         }
       } else {
-        logger.verbose(`Could not identify '${members[i].login}' from team '${teamName}', skipping`);
+        logger.verbose(`User '${members[i].login}' from team '${teamName}' identified as a bot, skipping`);
       }
     }
   }
