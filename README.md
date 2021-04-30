@@ -108,9 +108,11 @@ The following parameters can be used when running the sync scripts manually.
 | Parameter name | Required | Accepts | Default | Description |
 |----------------|:--------:|---------|---------|-------------|
 |-s, --secretLocation | ✓ | string | N/A | The location of the files containing API access tokens and secure configurations containing keys. |
+|-c, --console | x | boolean flag | `false` | Adds console output to logging statements for the current run |
 |-d, --dryRun | x | boolean flag | `false` | Runs script in dry run mode, not writing any changes to the API. |
 |-D, --deletionDryRun | x | boolean flag | `false` | Runs script in deletion dry run mode, not performing any deletion operations to the API. |
 |-t, --devMode | x | boolean flag | `false` | Runs the script with the dev mode active. This changes the returned data from the Eclipse API to affect a dev sandbox rather than production projects. |
+|-p, --project | x |string | N/A | The project ID (e.g. technology.dash) of the project that should be updated (at the exclusion of all other projects) |
 |-h, --help | x | N/A (flag) | N/A | Prints the help text for the script parameters. |
 |-V, --verbose | x | boolean flag | `false` | Sets the script to run in verbose mode (ranges from 1-4 for more verbose logging). |
 
@@ -119,11 +121,13 @@ The following parameters can be used when running the sync scripts manually.
 | Parameter name | Required | Accepts | Default | Description |
 |----------------|:--------:|---------|---------|-------------|
 |-s, --secretLocation | ✓ | string | N/A | The location of the files containing API access tokens and secure configurations containing keys. |
+|-c, --console | x | boolean flag | `false` | Adds console output to logging statements for the current run |
 |-d, --dryRun | x | boolean flag | `false` | Runs script as dry run, not writing any changes to API. |
 |-D, --devMode | x | boolean flag | `false` | Runs the script with the dev mode active. This changes the returned data from the Eclipse API to affect a dev sandbox rather than production projects. |
 |-H, --host | x | string | `https://gitlab.eclipse.org` | The Gitlab host target for the sync. This allows for testing and staging migrations for use in development and dry runs. |
 |-h, --help | x | N/A (flag) | N/A | Prints the help text for the script parameters. |
 |-p, --provider | x | string | `oauth2_generic` | The OAuth provider name set in GitLab for the Eclipse Accounts binding. |
+|-P, --project | x |string | N/A | The project ID (e.g. technology.dash) of the project that should be updated (at the exclusion of all other projects) |
 |-V, --verbose | x | boolean flag | `false` | Sets the script to run in verbose mode (ranges from 1-4 for more verbose logging). |
 
 ### Running the toolset for development
