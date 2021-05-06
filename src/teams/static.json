@@ -165,6 +165,11 @@
 				"name": "mkokabi",
 				"url": "https://api.eclipse.org/account/profile/mkokabi",
 				"expiration": ""
+			},
+			{
+				"name": "croundy",
+				"url": "https://api.eclipse.org/account/profile/croundy",
+				"expiration": ""
 			}
 		],
 		"permission": "TRIAGE",
