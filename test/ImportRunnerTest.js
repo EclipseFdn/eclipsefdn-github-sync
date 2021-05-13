@@ -28,7 +28,7 @@ describe('ImportRunner', function () {
     ghMock = sinon.mock(GH_BASE_WRAPPER);
     glMock = {
       Groups: {
-        show: function () {},
+        subgroups: function () {},
         create: function () {},
         remove: function () {},
       },
@@ -98,7 +98,7 @@ describe('ImportRunner', function () {
         let id = faker.datatype.number;
         // create the mock object to watch the process
         let mock = sinon.mock(glMock.Groups);
-        mock.expects('show').once().withArgs(id);
+        mock.expects('subgroups').once().withArgs(id);
 
         await runner.getBackupGroups({ id: id });
         // verify it was called once
@@ -121,7 +121,7 @@ describe('ImportRunner', function () {
         ];
         // create the mock object to watch the process
         let mock = sinon.mock(glMock.Groups);
-        mock.expects('show').once().withArgs(id).returns(sampleData);
+        mock.expects('subgroups').once().withArgs(id).returns(sampleData);
 
         // should return the data in exact format
         expect(await runner.getBackupGroups({ id: id })).to.eq(sampleData);
@@ -134,7 +134,7 @@ describe('ImportRunner', function () {
         let id = faker.datatype.number;
         // create the mock object to watch the process
         let mock = sinon.mock(glMock.Groups);
-        mock.expects('show').once().withArgs(id).throws();
+        mock.expects('subgroups').once().withArgs(id).throws();
 
         // should return an empty response on failure
         expect(await runner.getBackupGroups({ id: id })).to.be.undefined.and.not

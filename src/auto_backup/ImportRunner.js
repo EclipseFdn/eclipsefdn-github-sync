@@ -1,6 +1,8 @@
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 
+// used to check if we need a leading 0 for date checks
+const MONTH_INDEX_10 = 10;
 /**
  * Prints a message to log outside of test mode.
  *
@@ -60,8 +62,11 @@ class ImportRunner {
 
     // create backup target group for this run
     let today = new Date();
-    let g = await this.createBackupGroup(config, `backup-${today.getUTCFullYear()}${today.getUTCMonth()}${today.getUTCDate()}`,
-      config.target);
+    let monthNonZeroIndexed = today.getMonth() + 1;
+    let name = monthNonZeroIndexed < MONTH_INDEX_10 ? `backup-${today.getUTCFullYear()}0${monthNonZeroIndexed}${today.getUTCDate()}` :
+      `backup-${today.getUTCFullYear()}${monthNonZeroIndexed}${today.getUTCDate()}`;
+
+    let g = await this.createBackupGroup(config, name, config.target);
     if (g === undefined) {
       console.error('Could not create base group for backup process');
       this.report([], ['Could not create base group for backup process'], config.email);
@@ -143,7 +148,7 @@ class ImportRunner {
    */
   async getBackupGroups(g) {
     try {
-      return await this.gitlab.Groups.show(g.id);
+      return await this.gitlab.Groups.subgroups(g.id);
     } catch (e) {
       console.error(e);
     }
@@ -205,7 +210,7 @@ class ImportRunner {
       return false;
     }
     // only process groups with the pattern of backup-\d+ so that we can have static backups if necessary
-    groups.filter(a => a.match(/^backup-\d+$/)).sort((a, b) => (b.name).localeCompare(a.name));
+    groups.filter(a => a.name.match(/^backup-\d+$/)).sort((a, b) => (b.name).localeCompare(a.name));
     let count = 0;
     for (let gIdx in groups) {
       count++;
