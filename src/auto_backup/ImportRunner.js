@@ -201,7 +201,7 @@ class ImportRunner {
   async pruneBackupGroups(parent, config) {
     let groups = await this.getBackupGroups(parent);
     // return if there are no groups to process
-    if (!groups) {
+    if (groups === undefined || groups === null) {
       return false;
     }
     // only process groups with the pattern of backup-\d+ so that we can have static backups if necessary
