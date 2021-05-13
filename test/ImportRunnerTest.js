@@ -145,6 +145,32 @@ describe('ImportRunner', function () {
     });
   });
 
+  describe('#createBackupGroupName', function () {
+    describe('success', function () {
+      it('should allow for a date to be passed', async function () {
+        let generatedGroup = runner.getBackupGroupName(new Date(Date.parse('2020-06-15')));
+        expect(generatedGroup).to.eq('backup-20200615').and.to.not.eq(runner.getBackupGroupName());
+      });
+      it('should create for the current day', async function () {
+        expect(runner.getBackupGroupName(new Date())).to.eq(runner.getBackupGroupName());
+      });
+    });
+    describe('failure', function () {
+      it('should return undefined for bad dates', async function () {
+        let generatedGroup = runner.getBackupGroupName(new Date(Date.parse('sample bad date')));
+        expect(generatedGroup).to.be.undefined;
+      });
+      it('should return undefined for non-date objects', async function () {
+        let generatedGroup = runner.getBackupGroupName({});
+        expect(generatedGroup).to.be.undefined;
+      });
+      it('should use todays date if undefined/null passed', async function () {
+        expect(runner.getBackupGroupName(undefined)).to.eq(runner.getBackupGroupName());
+        expect(runner.getBackupGroupName(null)).to.eq(runner.getBackupGroupName());
+      });
+    });
+  });
+
   describe('#createBackupGroup', function () {
     describe('success', function () {
       it('should make a call to create a group', async function () {

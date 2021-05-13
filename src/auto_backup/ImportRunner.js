@@ -61,11 +61,11 @@ class ImportRunner {
     }
 
     // create backup target group for this run
-    let today = new Date();
-    let monthNonZeroIndexed = today.getMonth() + 1;
-    let name = monthNonZeroIndexed < MONTH_INDEX_10 ? `backup-${today.getUTCFullYear()}0${monthNonZeroIndexed}${today.getUTCDate()}` :
-      `backup-${today.getUTCFullYear()}${monthNonZeroIndexed}${today.getUTCDate()}`;
-
+    let name = this.getBackupGroupName();
+    if (name === undefined) {
+      console.error('Could not create base group for backup process');
+      this.report([], ['Could not create base group for backup process'], config.email);
+    }
     let g = await this.createBackupGroup(config, name, config.target);
     if (g === undefined) {
       console.error('Could not create base group for backup process');
@@ -313,6 +313,25 @@ class ImportRunner {
       text: message,
       html: html,
     });
+  }
+
+  /**
+   * Generates the name of the backup group, adding leading 0s to properly allow sorting based on the date.
+   *
+   * @returns the backup date for the given date, or today if not passed.
+   */
+  getBackupGroupName(date = new Date()) {
+    let actualDate = date === null ? new Date() : date;
+    // check via duck typing
+    if (typeof actualDate.getMonth !== 'function' || isNaN(actualDate.getTime())) {
+      return undefined;
+    }
+    // create backup target group for this run
+    let monthNonZeroIndexed = actualDate.getMonth() + 1;
+    let formattedMonth = monthNonZeroIndexed < MONTH_INDEX_10 ? `0${monthNonZeroIndexed}` : monthNonZeroIndexed;
+    let formattedDay = actualDate.getUTCDate() < MONTH_INDEX_10 ? `0${actualDate.getUTCDate()}` : actualDate.getUTCDate();
+
+    return `backup-${actualDate.getUTCFullYear()}${formattedMonth}${formattedDay}`;
   }
 }
 module.exports.ImportRunner = ImportRunner;
