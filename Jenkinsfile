@@ -107,6 +107,7 @@ pipeline {
                 kubectl set image "cronjob.v1beta1.batch/${GL_CRONJOB_NAME}" -n "${NAMESPACE}" "${GL_CONTAINER_NAME}=${GL_IMAGE_NAME}:${TAG_NAME}" --record=true
               fi
             '''
+          }
           withKubeConfig([credentialsId: 'ci-bot-okd-c1-token', serverUrl: 'https://api.okd-c1.eclipse.org:6443']) {
             sh '''
               BUI_CRONJOB="$(kubectl get cronjob ${BUI_CRONJOB_NAME} -n "${NAMESPACE}" -o json)"
