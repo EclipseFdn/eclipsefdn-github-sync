@@ -28,7 +28,7 @@ var argv = require('yargs')
     boolean: true,
   })
   .option('o', {
-    alias: 'org',
+    alias: 'organization',
     description: 'The name of the organization that should be backed up',
   })
   .option('H', {
@@ -78,7 +78,7 @@ async function run(t1, t2) {
     host: argv.H,
     token: t1,
   });
-  let wrapper = new Wrapper(t2);
+  let wrapper = new Wrapper(t2, true);
   // prep the import runner
   let imp = new ImportRunner();
   imp.githubAccessToken = t2;
