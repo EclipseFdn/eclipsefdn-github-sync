@@ -65,8 +65,6 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: import-backup-logs
-  annotations:
-    volume.beta.kubernetes.io/mount-options: rw,nfsvers=3,noexec
 spec:
   capacity:
     storage: 10Gi
@@ -76,8 +74,22 @@ spec:
     namespace: foundation-internal-webdev-apps
     name: import-backup-logs
   nfs:
-    server: fred
+    server: nfsmaster
     path: /opt/export/eclipsefdn-import-backup/logs
+  mountOptions:
+    - vers=4.2
+    - rw
+    - proto=tcp
+    - rsize=32768
+    - wsize=32768
+    - timeo=600
+    - fg
+    - hard
+    - retrans=10
+    - intr
+    - relatime
+    - nodiratime
+    - async
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
