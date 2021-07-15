@@ -28,7 +28,7 @@ spec:
             args:
             - /bin/sh
             - -c
-            - npm run import-backup -- --verbose=true --host="https://gitlab.eclipse.org" --target="264" --tls-min-v1.0 --target=openhw-group/github-backup --organization=openhwgroup 2>&1 | tee -a /app/logs/import-stdout-$(date +%Y-%m-%d).log
+            - npm run import-backup -- --verbose=true --host="https://gitlab.eclipse.org" --target="264" --tls-min-v1.0 --organization=openhwgroup 2>&1 | tee -a /app/logs/import-stdout-$(date +%Y-%m-%d).log
             volumeMounts:
             - name: logs
               mountPath: /app/logs
