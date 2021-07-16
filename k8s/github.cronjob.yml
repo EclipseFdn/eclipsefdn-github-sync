@@ -69,7 +69,7 @@ spec:
     namespace: foundation-internal-webdev-apps
     name: github-sync-logs
   nfs:
-    server: fred
+    server: nfsmaster
     path: /opt/export/eclipsefdn-github-sync/logs
 ---
 kind: PersistentVolumeClaim

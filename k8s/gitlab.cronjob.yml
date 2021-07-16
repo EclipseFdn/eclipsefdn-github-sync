@@ -81,7 +81,7 @@ spec:
     namespace: foundation-internal-webdev-apps
     name: gitlab-sync-logs
   nfs:
-    server: fred
+    server: nfsmaster
     path: /opt/export/eclipsefdn-gitlab-sync/logs
 ---
 kind: PersistentVolumeClaim
