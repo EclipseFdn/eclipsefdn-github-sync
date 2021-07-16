@@ -2,11 +2,6 @@
 var argv = require('yargs')
   .usage('Usage: $0 [options]')
   .example('$0', '')
-  .option('c', {
-    alias: 'console',
-    description: 'Print messages to console as well as to file logs',
-    boolean: true,
-  })
   .option('d', {
     alias: 'dryrun',
     description: 'Runs script as dry run, not writing any changes to API',
@@ -56,7 +51,7 @@ const { Gitlab } = require('gitlab');
 const EclipseAPI = require('./EclipseAPI.js');
 
 const { getLogger } = require('./logger.js');
-let logger = getLogger(argv.V ? 'debug' : 'info', 'main', argv.c);
+let logger = getLogger(argv.V ? 'debug' : 'info', 'main');
 
 var api;
 var eApi;
