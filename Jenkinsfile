@@ -89,7 +89,7 @@ pipeline {
       }
       steps {
         container('kubectl') {
-          withKubeConfig([credentialsId: '1d8095ea-7e9d-4e94-b799-6dadddfdd18a', serverUrl: 'https://console-int.c1-ci.eclipse.org']) {
+          withKubeConfig([credentialsId: 'ci-bot-okd-c1-token', serverUrl: 'https://api.okd-c1.eclipse.org:6443']) {
             sh '''
               CRONJOB="$(kubectl get cronjob ${CRONJOB_NAME} -n "${NAMESPACE}" -o json)"
               if [[ $(echo "${CRONJOB}" | jq -r 'length') -eq 0 ]]; then
