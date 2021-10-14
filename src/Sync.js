@@ -329,7 +329,7 @@ async function updateTeam(org, teamName, designatedMembers, project) {
   logger.info(`Syncing team '${teamName}' for organization ${org}`);
   var team = await wrap.addTeam(org, teamName);
   // set team to private
-  await wrap.editTeam(org, teamName, { privacy: 'secret' });
+  await wrap.editTeam(org, teamName, { privacy: 'closed' });
   var members = await wrap.getTeamMembers(org, team);
 
   logger.silly(`${teamName} members: ${JSON.stringify(designatedMembers)}`);
