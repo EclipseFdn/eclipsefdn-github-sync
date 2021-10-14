@@ -1,5 +1,12 @@
 # eclipsefdn-github-sync
 
+---
+**NOTE**
+
+This project was migrated to [Eclipse Gitlab](https://gitlab.eclipse.org/eclipsefdn/it/webdev/eclipsefdn-github-sync) on October 14, 2021.
+
+---
+
 The Eclipse Foundation toolkit for maintaining permissions across multiple version-control platforms. This includes scripts for syncronizing user permissions from PMI to Github or Gitlab, running automated backups of repositories, and managing bot access through a variety of means.
 
 ## Table of Contents
